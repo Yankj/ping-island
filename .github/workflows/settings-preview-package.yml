@@ -23,6 +23,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build unsigned preview package
+        env:
+          PING_ISLAND_ARCHS: arm64 x86_64
         run: ./scripts/package-unsigned.sh
 
       - name: Record checksums
