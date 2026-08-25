@@ -94,7 +94,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         )
         let window = SettingsPanelWindow(
             contentRect: NSRect(origin: .zero, size: defaultContentSize),
-            styleMask: [.borderless, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -103,10 +103,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.title = ""
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = false
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = false
+        window.isMovableByWindowBackground = true
+        window.isOpaque = true
+        window.backgroundColor = NSColor(
+            calibratedRed: 0.055,
+            green: 0.065,
+            blue: 0.085,
+            alpha: 1
+        )
+        window.hasShadow = true
         window.minSize = minimumContentSize
         window.maxSize = maximumContentSize
         window.setContentSize(defaultContentSize)
@@ -115,9 +120,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.toolbar = nil
         window.showsToolbarButton = false
         window.titlebarSeparatorStyle = .none
-        window.collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
+        window.collectionBehavior = [.fullScreenPrimary, .moveToActiveSpace]
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
+
+        window.standardWindowButton(.closeButton)?.isHidden = false
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = false
+        window.standardWindowButton(.zoomButton)?.isHidden = false
+        window.standardWindowButton(.zoomButton)?.isEnabled = true
 
         super.init(window: window)
 
@@ -126,9 +136,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             SettingsWindowView(
                 onClose: { [weak self] in
                     self?.dismiss()
-                },
-                onMinimize: { [weak self] in
-                    self?.window?.miniaturize(nil)
                 }
             )
         }
