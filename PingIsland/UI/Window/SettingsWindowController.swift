@@ -117,7 +117,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.setContentSize(defaultContentSize)
         window.identifier = NSUserInterfaceItemIdentifier("settings.window")
         window.center()
-        window.toolbar = nil
+        let toolbar = NSToolbar(identifier: "settings.toolbar")
+        toolbar.allowsUserCustomization = false
+        toolbar.autosavesConfiguration = false
+        toolbar.displayMode = .iconOnly
+        toolbar.sizeMode = .regular
+        toolbar.showsBaselineSeparator = false
+        window.toolbar = toolbar
+        window.toolbarStyle = .unified
         window.showsToolbarButton = false
         window.titlebarSeparatorStyle = .none
         window.collectionBehavior = [.fullScreenPrimary, .moveToActiveSpace]

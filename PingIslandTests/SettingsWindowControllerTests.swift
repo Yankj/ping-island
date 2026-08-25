@@ -118,6 +118,15 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertTrue(window.styleMask.contains(.fullSizeContentView))
         XCTAssertTrue(window.collectionBehavior.contains(.fullScreenPrimary))
         XCTAssertFalse(window.collectionBehavior.contains(.fullScreenAuxiliary))
+        XCTAssertTrue(window.titlebarAppearsTransparent)
+        XCTAssertEqual(window.titlebarSeparatorStyle, .none)
+        XCTAssertEqual(window.toolbarStyle, .unified)
+
+        let toolbar = try XCTUnwrap(window.toolbar)
+        XCTAssertTrue(toolbar.isVisible)
+        XCTAssertFalse(toolbar.allowsUserCustomization)
+        XCTAssertEqual(toolbar.sizeMode, .regular)
+        XCTAssertFalse(toolbar.showsBaselineSeparator)
 
         let closeButton = try XCTUnwrap(window.standardWindowButton(.closeButton))
         let minimizeButton = try XCTUnwrap(window.standardWindowButton(.miniaturizeButton))
@@ -136,6 +145,13 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertFalse(window.isMiniaturized)
 
         controller.dismiss()
+    }
+
+    func testSettingsSidebarUsesOutlineSystemSymbols() {
+        for category in SettingsCategory.allCases {
+            XCTAssertNotNil(NSImage(systemSymbolName: category.icon, accessibilityDescription: nil))
+            XCTAssertFalse(category.icon.contains("fill"), "\(category) should use an outline symbol")
+        }
     }
 
     func testSettingsWindowUsesAppLocaleRootView() throws {

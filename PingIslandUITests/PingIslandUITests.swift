@@ -38,6 +38,10 @@ final class PingIslandUITests: XCTestCase {
             let sidebarButton = app.buttons["settings.sidebar.\(category)"]
             XCTAssertTrue(sidebarButton.waitForExistence(timeout: 5))
             sidebarButton.tap()
+            XCTAssertTrue(
+                sidebarButton.isSelected,
+                "Sidebar selection for \(category) should update before detail loading finishes"
+            )
 
             XCTAssertTrue(
                 app.scrollViews["settings.detail.\(category)"].waitForExistence(timeout: 1),

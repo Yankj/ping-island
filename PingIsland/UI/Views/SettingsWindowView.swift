@@ -51,16 +51,16 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .general: return "gearshape.fill"
-        case .shortcuts: return "command.square.fill"
-        case .display: return "rectangle.on.rectangle"
-        case .mascot: return "face.smiling.fill"
-        case .sound: return "speaker.wave.2.fill"
+        case .general: return "gearshape"
+        case .shortcuts: return "command"
+        case .display: return "display"
+        case .mascot: return "pawprint"
+        case .sound: return "speaker.wave.2"
         case .analytics: return "chart.bar.xaxis"
-        case .integration: return "link.circle.fill"
-        case .remote: return "network.badge.shield.half.filled"
-        case .labs: return "flask.fill"
-        case .about: return "info.circle.fill"
+        case .integration: return "link"
+        case .remote: return "network"
+        case .labs: return "flask"
+        case .about: return "info.circle"
         }
     }
 
@@ -2404,6 +2404,7 @@ private enum SettingsPanelMetrics {
     static let popoverSize = CGSize(width: 760, height: 620)
     static let windowSidebarWidth: CGFloat = 236
     static let popoverSidebarWidth: CGFloat = 212
+    static let windowSidebarTopInset: CGFloat = 56
     static let windowContentTopInset: CGFloat = 0
     static let popoverContentTopInset: CGFloat = 0
     static let outerPadding: CGFloat = 0
@@ -2420,6 +2421,7 @@ private struct SettingsPanelContentView: View {
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var remoteManager = RemoteConnectorManager.shared
     @State private var selectedCategory: SettingsCategory? = .general
+    @State private var displayedCategory: SettingsCategory = .general
     @State private var pendingHookReinstallProfile: ManagedHookClientProfile?
     @State private var pendingHookOptionsRequest: HookInstallOptionsRequest?
     @State private var showingUninstallAllHooksConfirmation = false
@@ -2430,6 +2432,7 @@ private struct SettingsPanelContentView: View {
     @State private var consecutiveGeneralTapCount = 0
     @State private var isAccessibilityPollingActive = false
     @State private var arePreviewAnimationsActive = false
+    @State private var categoryPresentationTask: Task<Void, Never>?
     @State private var categoryRefreshTask: Task<Void, Never>?
 
     var body: some View {
@@ -2472,6 +2475,8 @@ private struct SettingsPanelContentView: View {
         .onDisappear {
             isAccessibilityPollingActive = false
             arePreviewAnimationsActive = false
+            categoryPresentationTask?.cancel()
+            categoryPresentationTask = nil
             categoryRefreshTask?.cancel()
             categoryRefreshTask = nil
         }
@@ -2734,20 +2739,55 @@ private struct SettingsPanelContentView: View {
                                         showsNoticeDot: category == .integration && viewModel.hasIntegrationNotice
                                     )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(SettingsSidebarButtonStyle())
+                                .help(Text(appLocalized: category.subtitle))
                                 .accessibilityIdentifier("settings.sidebar.\(category.rawValue)")
+                                .accessibilityLabel(Text(appLocalized: category.title))
+                                .accessibilityHint(Text(appLocalized: category.subtitle))
+                                .accessibilityAddTraits(
+                                    selectedCategory == category ? .isSelected : []
+                                )
                             }
                         }
                     }
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, presentation == .window ? 42 : 14)
-            .padding(.bottom, 14)
+            .padding(.horizontal, presentation == .window ? 10 : 12)
+            .padding(
+                .top,
+                presentation == .window ? SettingsPanelMetrics.windowSidebarTopInset : 14
+            )
+            .padding(.bottom, presentation == .window ? 12 : 14)
         }
-        .padding(8)
-        .background(
+        .padding(presentation == .window ? 0 : 8)
+        .background { sidebarBackground }
+        .overlay(alignment: .trailing) {
+            if presentation == .window {
+                Rectangle()
+                    .fill(Color.white.opacity(0.075))
+                    .frame(width: 1)
+                    .accessibilityHidden(true)
+            } else {
+                sidebarShape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            }
+        }
+        .shadow(
+            color: Color.black.opacity(presentation == .window ? 0 : 0.20),
+            radius: 24,
+            y: 14
+        )
+    }
+
+    @ViewBuilder
+    private var sidebarBackground: some View {
+        if presentation == .window {
+            SettingsGlassSurface(
+                material: .sidebar,
+                blendingMode: .withinWindow,
+                state: .followsWindowActiveState
+            )
+        } else {
             sidebarShape
                 .fill(Color.white.opacity(0.055))
                 .overlay {
@@ -2774,20 +2814,14 @@ private struct SettingsPanelContentView: View {
                         .blur(radius: 36)
                         .offset(x: 28, y: -26)
                 }
-        )
-        .overlay(sidebarShape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
-        .shadow(
-            color: Color.black.opacity(presentation == .window ? 0 : 0.20),
-            radius: 24,
-            y: 14
-        )
+        }
     }
 
     @ViewBuilder
     private var detail: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
-                switch currentCategory {
+                switch currentDetailCategory {
                 case .general:
                     generalContent
                 case .shortcuts:
@@ -2815,7 +2849,7 @@ private struct SettingsPanelContentView: View {
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .accessibilityIdentifier("settings.detail.\(currentCategory.rawValue)")
+        .accessibilityIdentifier("settings.detail.\(currentDetailCategory.rawValue)")
         .background(
             detailShape
                 .fill(Color.white.opacity(0.035))
@@ -2853,6 +2887,13 @@ private struct SettingsPanelContentView: View {
         return category
     }
 
+    private var currentDetailCategory: SettingsCategory {
+        guard displayedCategory != .labs || settings.labsSettingsUnlocked else {
+            return .general
+        }
+        return displayedCategory
+    }
+
     private var currentWindow: NSWindow? {
         NSApp.keyWindow ?? NSApp.mainWindow
     }
@@ -2871,7 +2912,34 @@ private struct SettingsPanelContentView: View {
             selectedCategory = .labs
         }
 
-        scheduleCategoryRefresh(for: currentCategory)
+        presentSelectedCategory(currentCategory)
+    }
+
+    private func presentSelectedCategory(_ category: SettingsCategory) {
+        categoryPresentationTask?.cancel()
+        categoryPresentationTask = nil
+
+        guard currentDetailCategory != category else {
+            scheduleCategoryRefresh(for: category)
+            return
+        }
+
+        categoryPresentationTask = Task { @MainActor in
+            // Preserve one display frame for the sidebar selection before building
+            // a potentially large detail hierarchy.
+            try? await Task.sleep(nanoseconds: 16_000_000)
+            guard !Task.isCancelled else { return }
+
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                displayedCategory = category
+            }
+
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            scheduleCategoryRefresh(for: category)
+        }
     }
 
     private func showAnalyticsConsentPromptIfNeeded() {
@@ -3894,37 +3962,17 @@ private struct SidebarItemView: View {
     let category: SettingsCategory
     let isSelected: Bool
     var showsNoticeDot: Bool = false
+    @Environment(\.controlActiveState) private var controlActiveState
+    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: category.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(isSelected ? 0.95 : 1))
-                    .frame(width: 24, height: 24)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(
-                                isSelected
-                                ? LinearGradient(
-                                    colors: [
-                                        category.tint.opacity(0.95),
-                                        category.tint.opacity(0.60)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                                : LinearGradient(
-                                    colors: [
-                                        category.tint.opacity(0.92),
-                                        category.tint.opacity(0.74)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .symbolRenderingMode(.monochrome)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.white.opacity(0.58))
+                    .frame(width: 18, height: 20)
 
                 if showsNoticeDot {
                     Circle()
@@ -3934,38 +3982,54 @@ private struct SidebarItemView: View {
                             Circle()
                                 .strokeBorder(Color.black.opacity(0.42), lineWidth: 1)
                         )
-                        .offset(x: 2, y: -2)
+                        .offset(x: 3, y: -1)
                         .accessibilityLabel("有需要注意的集成提示")
                 }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(appLocalized: category.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(isSelected ? 0.94 : 0.80))
-                    .lineLimit(1)
-
-                Text(appLocalized: category.subtitle)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(isSelected ? 0.60 : 0.42))
-                    .lineLimit(1)
-            }
+            Text(appLocalized: category.title)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                .foregroundColor(.white.opacity(isSelected ? 0.94 : 0.76))
+                .lineLimit(1)
 
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .frame(minHeight: 30)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(isSelected ? Color.white.opacity(0.12) : Color.white.opacity(0.02))
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(rowBackgroundColor)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(isSelected ? 0.10 : 0.04), lineWidth: 1)
-        )
-        .shadow(color: isSelected ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.10), value: isHovered)
+        .animation(.easeOut(duration: 0.10), value: isSelected)
+    }
+
+    private var rowBackgroundColor: Color {
+        if isSelected {
+            switch controlActiveState {
+            case .key:
+                return Color.accentColor.opacity(0.20)
+            case .active:
+                return Color.white.opacity(0.10)
+            case .inactive:
+                return Color.white.opacity(0.065)
+            @unknown default:
+                return Color.white.opacity(0.10)
+            }
+        }
+        return isHovered ? Color.white.opacity(0.055) : .clear
+    }
+}
+
+private struct SettingsSidebarButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.72 : 1)
+            .animation(.easeOut(duration: 0.06), value: configuration.isPressed)
     }
 }
 
