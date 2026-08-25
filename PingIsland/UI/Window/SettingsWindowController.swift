@@ -105,12 +105,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.isOpaque = true
-        window.backgroundColor = NSColor(
-            calibratedRed: 0.055,
-            green: 0.065,
-            blue: 0.085,
-            alpha: 1
-        )
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = .windowBackgroundColor
         window.hasShadow = true
         window.minSize = minimumContentSize
         window.maxSize = maximumContentSize

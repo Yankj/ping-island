@@ -110,6 +110,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertTrue(window.isMovableByWindowBackground)
         XCTAssertTrue(window.isOpaque)
         XCTAssertTrue(window.hasShadow)
+        XCTAssertEqual(window.appearance?.name, .darkAqua)
         XCTAssertEqual(window.backgroundColor.alphaComponent, 1, accuracy: 0.001)
         XCTAssertTrue(window.styleMask.contains(.titled))
         XCTAssertTrue(window.styleMask.contains(.closable))
