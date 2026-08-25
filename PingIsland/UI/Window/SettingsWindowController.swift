@@ -114,19 +114,22 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.hasShadow = true
         window.minSize = minimumContentSize
         window.maxSize = maximumContentSize
-        window.setContentSize(defaultContentSize)
         window.identifier = NSUserInterfaceItemIdentifier("settings.window")
-        window.center()
         let toolbar = NSToolbar(identifier: "settings.toolbar")
         toolbar.allowsUserCustomization = false
         toolbar.autosavesConfiguration = false
         toolbar.displayMode = .iconOnly
         toolbar.sizeMode = .regular
         toolbar.showsBaselineSeparator = false
+        toolbar.isVisible = true
         window.toolbar = toolbar
         window.toolbarStyle = .unified
         window.showsToolbarButton = false
         window.titlebarSeparatorStyle = .none
+        // Attaching a toolbar changes the content layout rect, so size the
+        // window only after its complete titlebar hierarchy is installed.
+        window.setContentSize(defaultContentSize)
+        window.center()
         window.collectionBehavior = [.fullScreenPrimary, .moveToActiveSpace]
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
