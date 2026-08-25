@@ -22,6 +22,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Run prototype tests
+        run: >
+          swift test
+          --package-path Prototype
+          --skip IslandBridgeE2ETests
+          --skip SocketServerTests
+
+      - name: Run Xcode unit tests
+        run: >
+          xcodebuild
+          -project PingIsland.xcodeproj
+          -scheme PingIsland
+          -configuration Debug
+          -destination 'platform=macOS'
+          -derivedDataPath "$RUNNER_TEMP/TestsDerivedData"
+          CODE_SIGNING_ALLOWED=NO
+          test
+          -only-testing:PingIslandTests
+
       - name: Build unsigned preview package
         env:
           PING_ISLAND_ARCHS: arm64 x86_64
