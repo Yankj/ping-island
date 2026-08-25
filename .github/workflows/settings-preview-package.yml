@@ -1,0 +1,41 @@
+name: Settings UX Preview Package
+
+on:
+  push:
+    branches:
+      - build/settings-window-ux-preview
+
+permissions:
+  contents: read
+
+concurrency:
+  group: settings-ux-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build unsigned macOS package
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build unsigned preview package
+        run: ./scripts/package-unsigned.sh
+
+      - name: Record checksums
+        shell: bash
+        run: shasum -a 256 releases/unsigned/* | tee releases/unsigned/SHA256SUMS
+
+      - name: Upload preview package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PingIsland-settings-window-ux-${{ github.sha }}
+          path: |
+            releases/unsigned/*.dmg
+            releases/unsigned/*.zip
+            releases/unsigned/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
