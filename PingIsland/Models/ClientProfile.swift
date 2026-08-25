@@ -1473,7 +1473,7 @@ enum ClientProfileRegistry {
         ManagedIDEExtensionProfile(
             id: "vscode-extension",
             title: "VS Code",
-            subtitle: "安装 Ping Island，支持终端精准聚焦",
+            subtitle: "安装 AgentIsland，支持终端精准聚焦",
             logoAssetName: "VSCodeLogo",
             prefersBundledLogoOverAppIcon: true,
             localAppBundleIdentifiers: ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"],
@@ -1488,7 +1488,7 @@ enum ClientProfileRegistry {
         ManagedIDEExtensionProfile(
             id: "cursor-extension",
             title: "Cursor",
-            subtitle: "安装 Ping Island，支持终端精准聚焦",
+            subtitle: "安装 AgentIsland，支持终端精准聚焦",
             logoAssetName: "CursorLogo",
             prefersBundledLogoOverAppIcon: true,
             localAppBundleIdentifiers: ["com.todesktop.230313mzl4w4u92"],
@@ -1503,7 +1503,7 @@ enum ClientProfileRegistry {
         ManagedIDEExtensionProfile(
             id: "codebuddy-extension",
             title: "CodeBuddy",
-            subtitle: "安装 Ping Island，支持终端精准聚焦",
+            subtitle: "安装 AgentIsland，支持终端精准聚焦",
             logoAssetName: "CodeBuddyLogo",
             prefersBundledLogoOverAppIcon: true,
             localAppBundleIdentifiers: ["com.tencent.codebuddy", "com.codebuddy.app"],
@@ -1524,7 +1524,7 @@ enum ClientProfileRegistry {
         ManagedIDEExtensionProfile(
             id: "workbuddy-extension",
             title: "WorkBuddy",
-            subtitle: "安装 Ping Island，支持终端精准聚焦",
+            subtitle: "安装 AgentIsland，支持终端精准聚焦",
             showsInSettings: false,
             logoAssetName: "WorkBuddyLogo",
             prefersBundledLogoOverAppIcon: true,
@@ -1540,7 +1540,7 @@ enum ClientProfileRegistry {
         ManagedIDEExtensionProfile(
             id: "qoder-extension",
             title: "Qoder",
-            subtitle: "安装 Ping Island，支持会话跳转与终端精准聚焦",
+            subtitle: "安装 AgentIsland，支持会话跳转与终端精准聚焦",
             logoAssetName: "QoderLogo",
             prefersBundledLogoOverAppIcon: true,
             sessionFocusStrategy: .qoderChatHistory,
@@ -1556,7 +1556,7 @@ enum ClientProfileRegistry {
         ManagedIDEExtensionProfile(
             id: "qoder-cn-extension",
             title: "Qoder CN",
-            subtitle: "安装 Ping Island，支持会话跳转与终端精准聚焦",
+            subtitle: "安装 AgentIsland，支持会话跳转与终端精准聚焦",
             logoAssetName: "QoderCNLogo",
             prefersBundledLogoOverAppIcon: true,
             sessionFocusStrategy: .qoderChatHistory,

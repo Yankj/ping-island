@@ -433,8 +433,8 @@ actor DiagnosticsExporter {
     func exportArchive(to destinationURL: URL) async throws -> DiagnosticsExportResult {
         let timestamp = Self.archiveTimestamp()
         let tempRoot = fileManager.temporaryDirectory
-            .appendingPathComponent("PingIsland-Diagnostics-\(UUID().uuidString)", isDirectory: true)
-        let exportRoot = tempRoot.appendingPathComponent("PingIsland-Diagnostics-\(timestamp)", isDirectory: true)
+            .appendingPathComponent("AgentIsland-Diagnostics-\(UUID().uuidString)", isDirectory: true)
+        let exportRoot = tempRoot.appendingPathComponent("AgentIsland-Diagnostics-\(timestamp)", isDirectory: true)
         var warnings: [String] = []
 
         try fileManager.createDirectory(at: exportRoot, withIntermediateDirectories: true)
@@ -706,7 +706,7 @@ actor DiagnosticsExporter {
         let result = try tailData(from: sourceURL, maxBytes: Self.maxDebugFileBytes)
         let text = String(decoding: result.data, as: UTF8.self)
         var output = result.wasTruncated
-            ? "[Ping Island diagnostics: file truncated to last \(Self.maxDebugFileBytes) bytes]\n"
+            ? "[AgentIsland diagnostics: file truncated to last \(Self.maxDebugFileBytes) bytes]\n"
             : ""
         output += DiagnosticsLogRedactor.redactedPlainText(text, limit: Self.maxDebugFileBytes)
 
@@ -718,7 +718,7 @@ actor DiagnosticsExporter {
         let result = try tailData(from: sourceURL, maxBytes: Self.maxDebugFileBytes)
         var output = Data()
         if result.wasTruncated {
-            output.append(Data("[Ping Island diagnostics: file truncated to last \(Self.maxDebugFileBytes) bytes]\n".utf8))
+            output.append(Data("[AgentIsland diagnostics: file truncated to last \(Self.maxDebugFileBytes) bytes]\n".utf8))
         }
         output.append(result.data)
 
@@ -856,7 +856,7 @@ actor DiagnosticsExporter {
     }
 
     private func writeUnifiedLogs(to destinationURL: URL) async throws {
-        let predicate = "subsystem == \"com.wudanwu.pingisland\""
+        let predicate = "subsystem == \"com.agentisland.app\""
         try await writeCommandOutput(
             executable: "/usr/bin/log",
             arguments: [

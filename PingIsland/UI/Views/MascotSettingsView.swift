@@ -337,7 +337,9 @@ private struct StatusRow: View {
     }
 }
 
+#if !LOCAL_UNSIGNED_BUILD
 #Preview {
     MascotSettingsView()
         .frame(width: 880, height: 760)
 }
+#endif

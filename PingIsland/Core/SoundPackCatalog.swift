@@ -3,18 +3,25 @@ import Combine
 import Foundation
 
 enum NotificationEvent: String, CaseIterable, Identifiable {
+    case sessionStarted
     case processingStarted
     case attentionRequired
     case taskCompleted
     case taskError
     case resourceLimit
+    case idleReminder
+    case usageWarning
+    case usageReset
+    case rapidSubmit
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .sessionStarted:
+            return "会话开始"
         case .processingStarted:
-            return "开始处理"
+            return "任务确认"
         case .attentionRequired:
             return "需要介入"
         case .taskCompleted:
@@ -22,14 +29,24 @@ enum NotificationEvent: String, CaseIterable, Identifiable {
         case .taskError:
             return "任务失败"
         case .resourceLimit:
-            return "资源受限"
+            return "上下文限制"
+        case .idleReminder:
+            return "闲置提醒"
+        case .usageWarning:
+            return "额度即将用完"
+        case .usageReset:
+            return "额度已恢复"
+        case .rapidSubmit:
+            return "连续提交"
         }
     }
 
     var subtitle: String {
         switch self {
+        case .sessionStarted:
+            return "检测到新的 Claude、Codex、Gemini 或 IDE 会话。"
         case .processingStarted:
-            return "会话开始处理、运行工具或进入阶段切换。"
+            return "你提交任务后，Agent 开始处理或运行工具。"
         case .attentionRequired:
             return "等待审批、回答问题或其他需要你接手的时刻。"
         case .taskCompleted:
@@ -38,11 +55,21 @@ enum NotificationEvent: String, CaseIterable, Identifiable {
             return "工具或子代理执行失败。"
         case .resourceLimit:
             return "进入 PreCompact / compacting，通常表示上下文或资源逼近限制。"
+        case .idleReminder:
+            return "Agent 已等待你的输入一段时间，再次轻声提醒。"
+        case .usageWarning:
+            return "Claude 或 Codex 的可用额度低于预警线。"
+        case .usageReset:
+            return "额度窗口刷新，可用配额已经恢复。"
+        case .rapidSubmit:
+            return "同一会话在 10 秒内连续提交多条消息。"
         }
     }
 
     var defaultSound: NotificationSound {
         switch self {
+        case .sessionStarted:
+            return .hero
         case .processingStarted:
             return .tink
         case .attentionRequired:
@@ -53,13 +80,23 @@ enum NotificationEvent: String, CaseIterable, Identifiable {
             return .basso
         case .resourceLimit:
             return .morse
+        case .idleReminder:
+            return .purr
+        case .usageWarning:
+            return .submarine
+        case .usageReset:
+            return .glass
+        case .rapidSubmit:
+            return .pop
         }
     }
 
     var cespCategories: [String] {
         switch self {
+        case .sessionStarted:
+            return ["session.start"]
         case .processingStarted:
-            return ["task.acknowledge", "session.start"]
+            return ["task.acknowledge"]
         case .attentionRequired:
             return ["input.required"]
         case .taskCompleted:
@@ -68,6 +105,39 @@ enum NotificationEvent: String, CaseIterable, Identifiable {
             return ["task.error"]
         case .resourceLimit:
             return ["resource.limit"]
+        case .idleReminder:
+            return ["idle.reminder"]
+        case .usageWarning:
+            return ["usage.warning"]
+        case .usageReset:
+            return ["usage.reset"]
+        case .rapidSubmit:
+            return ["user.spam"]
+        }
+    }
+
+    var defaultBundledSound: Island8BitSound {
+        switch self {
+        case .sessionStarted:
+            return .bootJingle
+        case .processingStarted:
+            return .menuSelect
+        case .attentionRequired:
+            return .approvalAlert
+        case .taskCompleted:
+            return .completeDing
+        case .taskError:
+            return .errorBuzz
+        case .resourceLimit:
+            return .hurt
+        case .idleReminder:
+            return .menuHighlight
+        case .usageWarning:
+            return .approvalAlert
+        case .usageReset:
+            return .powerUp
+        case .rapidSubmit:
+            return .itemPickup
         }
     }
 
@@ -75,6 +145,7 @@ enum NotificationEvent: String, CaseIterable, Identifiable {
 
 enum SoundThemeMode: String, CaseIterable, Identifiable {
     case builtIn
+    case softSynth
     case island8Bit
     case soundPack
 
@@ -84,8 +155,10 @@ enum SoundThemeMode: String, CaseIterable, Identifiable {
         switch self {
         case .builtIn:
             return "系统音"
+        case .softSynth:
+            return "柔和合成音"
         case .island8Bit:
-            return "内置 8-bit"
+            return "Pixel 登岛 8-bit"
         case .soundPack:
             return "主题包"
         }
@@ -95,8 +168,10 @@ enum SoundThemeMode: String, CaseIterable, Identifiable {
         switch self {
         case .builtIn:
             return "为不同阶段分别选择 macOS 系统音。"
+        case .softSynth:
+            return "短促、柔和且按事件语义设计的实时合成提示音。"
         case .island8Bit:
-            return "使用 Island 内置的 8-bit 固定方案，并带有客户端启动音。"
+            return "Silkscreen 像素主题的完整 8-bit 阶段音，并带有客户端启动旋律。"
         case .soundPack:
             return "使用兼容 OpenPeon / CESP 的本地音效包。"
         }
@@ -205,7 +280,7 @@ struct SoundPack: Identifiable, Equatable {
 }
 
 @MainActor
-final class SoundPackCatalog: NSObject, ObservableObject, NSSoundDelegate {
+final class SoundPackCatalog: NSObject, ObservableObject {
     static let shared = SoundPackCatalog()
 
     @Published private(set) var availablePacks: [SoundPack] = []
@@ -294,24 +369,15 @@ final class SoundPackCatalog: NSObject, ObservableObject, NSSoundDelegate {
         let entry = (selectable.isEmpty ? entries : selectable).randomElement()
 
         guard let entry,
-              let soundURL = resolvedSoundURL(for: entry, in: pack),
-              let sound = NSSound(contentsOf: soundURL, byReference: true) else {
+              let soundURL = resolvedSoundURL(for: entry, in: pack) else {
             return false
         }
 
-        sound.delegate = self
-        let didPlay = AppSoundPlayback.shared.play(sound, volume: volume)
-        if !didPlay {
-            sound.delegate = nil
-            return false
-        }
+        let didPlay = AppSoundPlayback.shared.play(contentsOf: soundURL, volume: volume)
+        guard didPlay else { return false }
 
         lastPlayedSoundPathByCategory[category] = entry.file
         return true
-    }
-
-    func sound(_ sound: NSSound, didFinishPlaying flag: Bool) {
-        AppSoundPlayback.shared.clearIfActive(sound)
     }
 
     private func importedPackRoots() -> [URL] {

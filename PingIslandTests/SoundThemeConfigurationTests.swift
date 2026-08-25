@@ -2,12 +2,14 @@ import XCTest
 @testable import Ping_Island
 
 final class SoundThemeConfigurationTests: XCTestCase {
-    func testIsland8BitThemeModeIsAvailable() {
+    func testBundledAndSynthThemeModesAreAvailable() {
         XCTAssertTrue(SoundThemeMode.allCases.contains(.island8Bit))
-        XCTAssertEqual(SoundThemeMode.island8Bit.title, "内置 8-bit")
+        XCTAssertTrue(SoundThemeMode.allCases.contains(.softSynth))
+        XCTAssertEqual(SoundThemeMode.island8Bit.title, "Pixel 登岛 8-bit")
+        XCTAssertEqual(SoundThemeMode.softSynth.title, "柔和合成音")
         XCTAssertEqual(
-            SoundThemeMode(rawValue: "missing-theme") ?? .island8Bit,
-            .island8Bit
+            SoundThemeMode(rawValue: "missing-theme") ?? .softSynth,
+            .softSynth
         )
     }
 

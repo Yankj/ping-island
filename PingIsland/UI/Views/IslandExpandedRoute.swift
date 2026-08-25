@@ -86,6 +86,13 @@ enum IslandExpandedRouteResolver {
         }
     }
 
+    nonisolated static func compactPreviewSessions(
+        from sessions: [SessionState],
+        limit: Int = 2
+    ) -> [SessionState] {
+        Array(activePreviewSessions(from: sessions).prefix(max(0, limit)))
+    }
+
     nonisolated static func highestPriorityAttentionSession(from sessions: [SessionState]) -> SessionState? {
         orderedSessions(from: sessions)
             .filter(\.needsPromptNotification)

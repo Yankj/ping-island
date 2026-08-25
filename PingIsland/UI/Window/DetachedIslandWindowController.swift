@@ -184,11 +184,15 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
     private var isPetInNotchZone = false
     private var isPetSecondaryClickArmed = false
     private var hasPrimedSoundTransitions = false
+    private var previousSessionSoundIds = Set<String>()
     private var previousProcessingIds = Set<String>()
     private var previousAttentionSoundIds = Set<String>()
     private var previousCompletionSoundIds = Set<String>()
     private var previousTaskErrorIds = Set<String>()
     private var previousResourceLimitIds = Set<String>()
+    private var rapidSubmitSoundTracker = RapidSubmitSoundTracker()
+    private var idleReminderSoundTracker = IdleReminderSoundTracker()
+    private var previousUsageSoundPercentage: Double?
     private var previousCompletionNotificationPhases: [String: SessionPhase] = [:]
     private var completionNotificationQueue: [SessionCompletionNotification] = []
     private var currentEnergyMode: EnergyMode = .quietBackground
@@ -509,6 +513,41 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         SettingsWindowController.shared.present()
     }
 
+    private func presentPetContextMenu(for event: NSEvent) {
+        guard let contentView = window?.contentView else { return }
+        dismissFloatingSettingsHint()
+
+        let menu = NSMenu(title: "AgentIsland")
+        let settingsItem = NSMenuItem(
+            title: AppLocalization.string("打开设置"),
+            action: #selector(openSettingsFromPetContextMenu),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        menu.addItem(settingsItem)
+        menu.addItem(.separator())
+
+        let quitItem = NSMenuItem(
+            title: AppLocalization.string("退出 AgentIsland"),
+            action: #selector(quitFromPetContextMenu),
+            keyEquivalent: "q"
+        )
+        quitItem.target = self
+        quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+        menu.addItem(quitItem)
+
+        NSMenu.popUpContextMenu(menu, with: event, for: contentView)
+    }
+
+    @objc private func openSettingsFromPetContextMenu() {
+        handlePetSecondaryClick()
+    }
+
+    @objc private func quitFromPetContextMenu() {
+        NSApplication.shared.terminate(nil)
+    }
+
     func presentHoverBubbleForTesting() {
         let canPresentBubble = DetachedIslandContentModel.canPresentBubble(
             from: sessionMonitor.instances,
@@ -645,6 +684,21 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
                 self?.reconcileHighlightedSessionState()
                 self?.reconcileBubbleStateWithAvailableContent()
                 self?.scheduleWindowSizeUpdate()
+            }
+            .store(in: &cancellables)
+
+        Timer.publish(every: 30, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] now in
+                self?.handleIdleReminderSound(at: now)
+            }
+            .store(in: &cancellables)
+
+        sessionMonitor.$claudeUsageSnapshot
+            .combineLatest(sessionMonitor.$codexUsageSnapshot)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] claude, codex in
+                self?.handleUsageSoundTransition(claude: claude, codex: codex)
             }
             .store(in: &cancellables)
 
@@ -1125,7 +1179,7 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         guard isPetSecondaryClickArmed else { return false }
         guard isPointInsidePet(event.locationInWindow) else { return true }
 
-        handlePetSecondaryClick()
+        presentPetContextMenu(for: event)
         return true
     }
 
@@ -1920,6 +1974,7 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
     }
 
     private func primeSoundTransitions(_ instances: [SessionState]) {
+        previousSessionSoundIds = Set(instances.map(\.stableId))
         previousProcessingIds = Set(
             instances
                 .filter(\.phase.contributesToProcessingSoundEdge)
@@ -1962,6 +2017,10 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         let resourceLimitedSessions = instances.filter {
             $0.phase == .compacting
         }
+        let newSessionIds = Set(instances.map(\.stableId))
+        let sessionDeltaIds = newSessionIds.subtracting(previousSessionSoundIds)
+        let newlyStartedSessions = instances.filter { sessionDeltaIds.contains($0.stableId) }
+        let rapidSubmitSessions = rapidSubmitSoundTracker.observe(instances)
 
         let newProcessingIds = Set(processingSessions.map(\.stableId))
         let newAttentionIds = Set(attentionSessions.map(\.stableId))
@@ -1994,15 +2053,49 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
             playEventSoundIfNeeded(.attentionRequired, sessions: attentionSessions)
         } else if isNewCompletion {
             playEventSoundIfNeeded(.taskCompleted, sessions: newlyCompletedSessions)
+        } else if !sessionDeltaIds.isEmpty {
+            playEventSoundIfNeeded(.sessionStarted, sessions: newlyStartedSessions)
         } else if !newProcessingIds.subtracting(previousProcessingIds).isEmpty {
             playEventSoundIfNeeded(.processingStarted, sessions: processingSessions)
+        } else if !rapidSubmitSessions.isEmpty {
+            playEventSoundIfNeeded(.rapidSubmit, sessions: rapidSubmitSessions)
         }
 
+        previousSessionSoundIds = newSessionIds
         previousProcessingIds = newProcessingIds
         previousAttentionSoundIds = newAttentionIds
         previousCompletionSoundIds = newCompletedIds
         previousTaskErrorIds = newTaskErrorIds
         previousResourceLimitIds = newResourceLimitIds
+    }
+
+    private func handleIdleReminderSound(at now: Date) {
+        let sessions = idleReminderSoundTracker.sessionsNeedingReminder(
+            from: sessionMonitor.instances,
+            now: now
+        )
+        guard !sessions.isEmpty else { return }
+        playEventSoundIfNeeded(.idleReminder, sessions: sessions)
+    }
+
+    private func handleUsageSoundTransition(
+        claude: ClaudeUsageSnapshot?,
+        codex: CodexUsageSnapshot?
+    ) {
+        let current = UsageSoundTransitionEvaluator.maximumUsedPercentage(
+            claude: claude,
+            codex: codex
+        )
+        defer { previousUsageSoundPercentage = current }
+        guard let event = UsageSoundTransitionEvaluator.event(
+            previous: previousUsageSoundPercentage,
+            current: current
+        ), AppSettings.soundEnabled,
+           AppSettings.isSoundEnabled(for: event),
+           !AppSettings.areReminderNotificationsSuppressed else {
+            return
+        }
+        AppSettings.playSound(for: event, respectsDebounce: true)
     }
 
     private func playEventSoundIfNeeded(_ event: NotificationEvent, sessions: [SessionState]) {

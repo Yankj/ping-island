@@ -25,10 +25,10 @@ struct TelemetryConfiguration: Equatable, Sendable {
 
     nonisolated init(
         slsHost: String,
-        project: String = "ping-island",
-        logstore: String = "ping-island",
+        project: String = "agent-island",
+        logstore: String = "agent-island",
         topic: String = "product-telemetry",
-        source: String = "ping-island-macos",
+        source: String = "agent-island-macos",
         dailyEventLimit: Int = 200
     ) {
         self.slsHost = Self.normalizedHost(slsHost)
@@ -40,13 +40,13 @@ struct TelemetryConfiguration: Equatable, Sendable {
     }
 
     nonisolated init(infoDictionary: [String: Any] = Bundle.main.infoDictionary ?? [:]) {
-        let dailyLimitRaw = infoDictionary["PINGTelemetryDailyEventLimit"] as? String
+        let dailyLimitRaw = infoDictionary["AgentIslandTelemetryDailyEventLimit"] as? String
         self.init(
-            slsHost: infoDictionary["PINGTelemetrySLSHost"] as? String ?? "",
-            project: infoDictionary["PINGTelemetrySLSProject"] as? String ?? "ping-island",
-            logstore: infoDictionary["PINGTelemetrySLSLogstore"] as? String ?? "ping-island",
-            topic: infoDictionary["PINGTelemetrySLSTopic"] as? String ?? "product-telemetry",
-            source: infoDictionary["PINGTelemetrySLSSource"] as? String ?? "ping-island-macos",
+            slsHost: infoDictionary["AgentIslandTelemetrySLSHost"] as? String ?? "",
+            project: infoDictionary["AgentIslandTelemetrySLSProject"] as? String ?? "agent-island",
+            logstore: infoDictionary["AgentIslandTelemetrySLSLogstore"] as? String ?? "agent-island",
+            topic: infoDictionary["AgentIslandTelemetrySLSTopic"] as? String ?? "product-telemetry",
+            source: infoDictionary["AgentIslandTelemetrySLSSource"] as? String ?? "agent-island-macos",
             dailyEventLimit: Int(dailyLimitRaw ?? "") ?? 200
         )
     }
@@ -159,7 +159,7 @@ struct SLSTelemetrySink: TelemetrySink {
             "__source__": configuration.source,
             "__logs__": records.map(\.fields),
             "__tags__": [
-                "app": "ping-island",
+                "app": "agent-island",
                 "schema": "1"
             ]
         ]
@@ -187,7 +187,7 @@ enum TelemetryError: Error {
 actor TelemetryService {
     static let shared = TelemetryService()
 
-    private static let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Telemetry")
+    private static let logger = Logger(subsystem: "com.agentisland.app", category: "Telemetry")
 
     private let configuration: TelemetryConfiguration
     private let defaults: UserDefaults

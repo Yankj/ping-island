@@ -659,7 +659,7 @@ struct ChatView: View {
 
     private var terminalRoutedPromptNotice: some View {
         Text(verbatim: AppLocalization.format(
-            "已保留在%@中处理。Ping Island 只提醒，不接管此处响应。",
+            "已保留在%@中处理。AgentIsland 只提醒，不接管此处响应。",
             session.isInTmux ? AppLocalization.string("终端") : session.interactionDisplayName
         ))
         .font(.system(size: 11, weight: .medium))
@@ -928,7 +928,7 @@ struct MessageItemView: View, Equatable {
 struct UserMessageView: View {
     let text: String
     let onTap: () -> Void
-    private let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "ChatTap")
+    private let logger = Logger(subsystem: "com.agentisland.app", category: "ChatTap")
 
     var body: some View {
         HStack {
@@ -957,7 +957,7 @@ struct AssistantMessageView: View {
     let accentColor: Color
     let textColor: Color
     let onTap: () -> Void
-    private let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "ChatTap")
+    private let logger = Logger(subsystem: "com.agentisland.app", category: "ChatTap")
 
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
@@ -1544,6 +1544,7 @@ struct ChatApprovalBar: View {
     let onApproveForSession: () -> Void
     let onDeny: () -> Void
 
+    @ObservedObject private var settings = AppSettings.shared
     @State private var showContent = false
     @State private var showAllowButton = false
     @State private var showDenyButton = false
@@ -1554,7 +1555,7 @@ struct ChatApprovalBar: View {
             // Tool info
             VStack(alignment: .leading, spacing: 2) {
                 Text(MCPToolFormatter.formatToolName(tool))
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .font(AgentIslandThemeFont.display(size: 12, theme: settings.visualThemeMode))
                     .foregroundColor(TerminalColors.amber)
                 if let input = toolInput {
                     Text(input)
@@ -1573,60 +1574,61 @@ struct ChatApprovalBar: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.62))
             } else {
-                // Deny button
-                Button {
-                    onDeny()
-                } label: {
-                    Text(AppLocalization.string("Deny"))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.1))
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+                approvalButton(
+                    title: AppLocalization.string("Deny"),
+                    systemName: "xmark",
+                    pixelGlyph: .deny,
+                    foreground: Color(red: 1.0, green: 0.66, blue: 0.66),
+                    background: Color.red.opacity(0.14),
+                    border: Color.red.opacity(0.46),
+                    action: onDeny
+                )
                 .opacity(showDenyButton ? 1 : 0)
                 .scaleEffect(showDenyButton ? 1 : 0.8)
 
                 if let sessionAction {
-                    Button {
-                        onApproveForSession()
-                    } label: {
-                        Text(AppLocalization.string(sessionAction.buttonTitleKey))
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.92))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(TerminalColors.blue.opacity(0.26))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
+                    approvalButton(
+                        title: AppLocalization.string(sessionAction.buttonTitleKey),
+                        systemName: "shield.checkered",
+                        pixelGlyph: .session,
+                        foreground: Color(red: 0.72, green: 0.84, blue: 1.0),
+                        background: TerminalColors.blue.opacity(0.24),
+                        border: TerminalColors.blue.opacity(0.48),
+                        action: onApproveForSession
+                    )
                     .opacity(showSessionButton ? 1 : 0)
                     .scaleEffect(showSessionButton ? 1 : 0.8)
                 }
 
-                // Allow button
-                Button {
-                    onApprove()
-                } label: {
-                    Text(AppLocalization.string("Allow"))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.95))
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+                approvalButton(
+                    title: AppLocalization.string("Allow"),
+                    systemName: "checkmark",
+                    pixelGlyph: .approve,
+                    foreground: Color(red: 0.02, green: 0.18, blue: 0.12),
+                    background: Color(red: 0.48, green: 0.94, blue: 0.70),
+                    border: Color(red: 0.66, green: 1.0, blue: 0.84).opacity(0.72),
+                    action: onApprove
+                )
                 .opacity(showAllowButton ? 1 : 0)
                 .scaleEffect(showAllowButton ? 1 : 0.8)
             }
         }
-        .frame(minHeight: 44)  // Consistent height with other bars
+        .frame(minHeight: 48)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color.black.opacity(0.2))
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0.30), Color.black.opacity(0.18)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 1)
+        }
+        .environment(\.agentIslandVisualTheme, settings.visualThemeMode)
         .onAppear {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05)) {
                 showContent = true
@@ -1641,6 +1643,44 @@ struct ChatApprovalBar: View {
                 showAllowButton = !suppressControls
             }
         }
+    }
+
+    private func approvalButton(
+        title: String,
+        systemName: String,
+        pixelGlyph: AgentIslandPixelGlyph,
+        foreground: Color,
+        background: Color,
+        border: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                AgentIslandThemeSymbol(
+                    systemName: systemName,
+                    pixelGlyph: pixelGlyph,
+                    size: 13,
+                    color: foreground
+                )
+                Text(title)
+                    .font(AgentIslandThemeFont.display(size: 12, theme: settings.visualThemeMode))
+                    .lineLimit(1)
+            }
+            .foregroundColor(foreground)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 36)
+            .background(
+                RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 18, style: .continuous)
+                    .fill(background)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 18, style: .continuous)
+                    .strokeBorder(border, lineWidth: settings.visualThemeMode.isPixel ? 2 : 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 }
 

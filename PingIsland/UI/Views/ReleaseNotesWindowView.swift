@@ -60,10 +60,7 @@ struct ReleaseNotesWindowView: View {
     }
 
     private var appIcon: some View {
-        Image(nsImage: NSApp.applicationIconImage)
-            .resizable()
-            .frame(width: 60, height: 60)
-            .shadow(color: .black.opacity(0.2), radius: 8, y: 5)
+        AgentIslandBrandIcon(size: 60, shadowRadius: 8)
     }
 
     private var versionBadge: some View {

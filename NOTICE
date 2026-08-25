@@ -1,9 +1,21 @@
+AgentIsland
+Copyright 2026 AgentIsland contributors
+
+This product is a modified distribution based on Ping Island:
+https://github.com/erha19/ping-island
+
 Ping Island
 Copyright 2026 Ping Island contributors
 
-Ping Island is an independent project. It draws inspiration from
-claude-island by Farouq Aldori, but it is not a full fork or a verbatim
-derivative of that project.
+The original Ping Island copyright, attribution, and license terms are
+preserved. AgentIsland is not an official Ping Island release. Major
+modifications include AgentIsland branding and application identity, a new
+application icon, an expanded onboarding and launch ceremony, semantic sound
+stages, UI refinements, and the optional Pixel Landing visual/audio theme.
+
+Compatibility identifiers including PingIslandBridge, selected legacy
+configuration paths, protocol names, and internal module names may remain to
+avoid breaking existing hooks, remote installations, or user data.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this work except in compliance with the License.

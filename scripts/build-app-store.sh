@@ -6,16 +6,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="${PING_ISLAND_APP_STORE_BUILD_DIR:-$PROJECT_DIR/build/app-store}"
 DERIVED_DATA_PATH="$BUILD_DIR/DerivedData"
-ARCHIVE_PATH="$BUILD_DIR/PingIslandAppStore.xcarchive"
+ARCHIVE_PATH="$BUILD_DIR/AgentIslandAppStore.xcarchive"
 EXPORT_PATH="$BUILD_DIR/export"
 EXPORT_OPTIONS="$BUILD_DIR/ExportOptions-AppStore.plist"
-TEAM_ID="${PING_ISLAND_TEAM_ID:-K46RM9974S}"
+TEAM_ID="${AGENT_ISLAND_TEAM_ID:-${PING_ISLAND_TEAM_ID:-}}"
 SCHEME="${PING_ISLAND_APP_STORE_SCHEME:-PingIslandAppStore}"
 PROJECT_FILE="${PING_ISLAND_PROJECT_FILE:-PingIsland.xcodeproj}"
 SKIP_SIGNING="${PING_ISLAND_SKIP_APP_STORE_SIGNING:-0}"
 UPLOAD="${PING_ISLAND_APP_STORE_UPLOAD:-0}"
 APP_STORE_ENTITLEMENTS="$PROJECT_DIR/PingIsland/Resources/PingIsland-AppStore.entitlements"
-APP_GROUP_ID="group.com.wudanwu.PingIsland"
+APP_GROUP_ID="group.com.agentisland.app"
 ALLOW_DEVICE_REGISTRATION="${PING_ISLAND_ALLOW_PROVISIONING_DEVICE_REGISTRATION:-1}"
 
 rm -rf "$BUILD_DIR"
@@ -46,6 +46,10 @@ archive_args=(
 if [ "$SKIP_SIGNING" = "1" ]; then
     archive_args+=(CODE_SIGNING_ALLOWED=NO)
 else
+    if [ -z "$TEAM_ID" ]; then
+        echo "error: Set AGENT_ISLAND_TEAM_ID before creating a signed App Store archive." >&2
+        exit 1
+    fi
     archive_args+=(
         -allowProvisioningUpdates
         CODE_SIGN_STYLE=Automatic

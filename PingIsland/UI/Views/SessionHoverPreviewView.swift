@@ -104,7 +104,7 @@ struct SessionHoverDashboardView: View {
     var onQuestionInteractionStateChanged: (Bool) -> Void = { _ in }
 
     private var displayedSessions: [SessionState] {
-        Array(sessions.prefix(3))
+        Array(sessions.prefix(2))
     }
 
     var body: some View {
@@ -650,7 +650,7 @@ private struct HoverTerminalRoutedPromptNotice: View {
 
     var body: some View {
         Text(verbatim: AppLocalization.format(
-            "已保留在%@中处理。Ping Island 只提醒，不接管此处响应。",
+            "已保留在%@中处理。AgentIsland 只提醒，不接管此处响应。",
             session.isInTmux ? AppLocalization.string("终端") : session.interactionDisplayName
         ))
         .font(.system(size: 11, weight: .medium))

@@ -32,9 +32,9 @@
 		A10000000000000000000002 /* PingIslandUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PingIslandUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000000000000000000001E /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
 		A1000000000000000000001F /* LocalSecrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = LocalSecrets.example.xcconfig; sourceTree = "<group>"; };
-		A10000000000000000000022 /* Ping Island.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Ping Island.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000022 /* AgentIsland.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AgentIsland.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000000000000000000002C /* AppStore.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppStore.xcconfig; sourceTree = "<group>"; };
-		FD33FD5D2EDF32D7002A6548 /* Ping Island.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Ping Island.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD33FD5D2EDF32D7002A6548 /* AgentIsland.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AgentIsland.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -135,8 +135,8 @@
 		FD33FD5E2EDF32D7002A6548 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				FD33FD5D2EDF32D7002A6548 /* Ping Island.app */,
-				A10000000000000000000022 /* Ping Island.app */,
+				FD33FD5D2EDF32D7002A6548 /* AgentIsland.app */,
+				A10000000000000000000022 /* AgentIsland.app */,
 				A10000000000000000000001 /* PingIslandTests.xctest */,
 				A10000000000000000000002 /* PingIslandUITests.xctest */,
 			);
@@ -212,7 +212,7 @@
 			packageProductDependencies = (
 			);
 			productName = PingIsland;
-			productReference = A10000000000000000000022 /* Ping Island.app */;
+			productReference = A10000000000000000000022 /* AgentIsland.app */;
 			productType = "com.apple.product-type.application";
 		};
 		FD33FD5C2EDF32D7002A6548 /* PingIsland */ = {
@@ -236,7 +236,7 @@
 				A1000000000000000000001C /* Sparkle */,
 			);
 			productName = PingIsland;
-			productReference = FD33FD5D2EDF32D7002A6548 /* Ping Island.app */;
+			productReference = FD33FD5D2EDF32D7002A6548 /* AgentIsland.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -415,8 +415,8 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 2DKS5U9LV4;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -425,7 +425,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIslandTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -433,7 +433,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ping Island.app/Contents/MacOS/Ping Island";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AgentIsland.app/Contents/MacOS/AgentIsland";
 				TEST_TARGET_NAME = PingIsland;
 			};
 			name = Debug;
@@ -443,8 +443,8 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 2DKS5U9LV4;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -453,7 +453,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIslandTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -461,7 +461,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ping Island.app/Contents/MacOS/Ping Island";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AgentIsland.app/Contents/MacOS/AgentIsland";
 				TEST_TARGET_NAME = PingIsland;
 			};
 			name = Release;
@@ -470,8 +470,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 2DKS5U9LV4;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -480,7 +480,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIslandUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -496,8 +496,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 2DKS5U9LV4;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -506,7 +506,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIslandUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -528,8 +528,8 @@
 				CODE_SIGN_ENTITLEMENTS = "PingIsland/Resources/PingIsland-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 73;
-				DEVELOPMENT_TEAM = K46RM9974S;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -542,9 +542,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.28.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIsland;
-				PRODUCT_NAME = "Ping Island";
+				MARKETING_VERSION = 0.29.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.app;
+				PRODUCT_NAME = AgentIsland;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG APP_STORE $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -566,8 +566,8 @@
 				CODE_SIGN_ENTITLEMENTS = "PingIsland/Resources/PingIsland-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 73;
-				DEVELOPMENT_TEAM = K46RM9974S;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -580,9 +580,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.28.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIsland;
-				PRODUCT_NAME = "Ping Island";
+				MARKETING_VERSION = 0.29.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.app;
+				PRODUCT_NAME = AgentIsland;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "APP_STORE $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -628,7 +628,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 2DKS5U9LV4;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -692,7 +692,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 2DKS5U9LV4;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -724,8 +724,8 @@
 				CODE_SIGN_ENTITLEMENTS = PingIsland/Resources/PingIsland.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 73;
-				DEVELOPMENT_TEAM = K46RM9974S;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -738,9 +738,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.28.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIsland;
-				PRODUCT_NAME = "Ping Island";
+				MARKETING_VERSION = 0.29.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.app;
+				PRODUCT_NAME = AgentIsland;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -761,8 +761,8 @@
 				CODE_SIGN_ENTITLEMENTS = PingIsland/Resources/PingIsland.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 73;
-				DEVELOPMENT_TEAM = K46RM9974S;
+				CURRENT_PROJECT_VERSION = 7500;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -775,9 +775,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.28.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wudanwu.PingIsland;
-				PRODUCT_NAME = "Ping Island";
+				MARKETING_VERSION = 0.29.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentisland.app;
+				PRODUCT_NAME = AgentIsland;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

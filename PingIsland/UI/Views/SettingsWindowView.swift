@@ -64,6 +64,21 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         }
     }
 
+    var pixelGlyph: AgentIslandPixelGlyph {
+        switch self {
+        case .general: return .settings
+        case .shortcuts: return .shortcuts
+        case .display: return .display
+        case .mascot: return .mascot
+        case .sound: return .sound
+        case .analytics: return .analytics
+        case .integration: return .integration
+        case .remote: return .remote
+        case .labs: return .labs
+        case .about: return .info
+        }
+    }
+
     var tint: Color {
         switch self {
         case .general: return Color(red: 0.12, green: 0.42, blue: 0.95)
@@ -577,7 +592,7 @@ final class SettingsPanelViewModel: ObservableObject {
         panel.allowedContentTypes = [.zip]
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
-        panel.nameFieldStringValue = "PingIsland-Diagnostics-\(Self.archiveTimestamp()).zip"
+        panel.nameFieldStringValue = "AgentIsland-Diagnostics-\(Self.archiveTimestamp()).zip"
 
         guard panel.runModal() == .OK, let destinationURL = panel.url else { return }
 
@@ -664,6 +679,7 @@ private enum SettingsPanelPresentation {
 private struct SoundSettingsContent: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var soundPacks = SoundPackCatalog.shared
+    @State private var isPreviewingAllStages = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -694,6 +710,31 @@ private struct SoundSettingsContent: View {
                 )
             }
 
+            SettingsSectionCard(title: "启动与试听") {
+                SettingsActionLine(
+                    title: "重播启动仪式音效",
+                    subtitle: "播放 AgentIsland 原创六秒立体欢迎音。"
+                ) {
+                    AppSettings.prepareSoundPlayback()
+                    AppSettings.playOnboardingCeremonySound()
+                } accessory: {
+                    Image(systemName: "waveform.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(SettingsCategory.sound.tint)
+                }
+                SettingsLineDivider()
+                SettingsActionLine(
+                    title: isPreviewingAllStages ? "正在试听十个阶段…" : "依次试听全部阶段",
+                    subtitle: "会话开始、任务确认、介入、完成、错误、限制、提醒与额度事件。"
+                ) {
+                    previewAllSoundStages()
+                } accessory: {
+                    Image(systemName: isPreviewingAllStages ? "speaker.wave.3.fill" : "play.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(SettingsCategory.sound.tint)
+                }
+            }
+
             if settings.soundThemeMode == .builtIn {
                 SoundEventSection(title: "阶段音效") {
                     ForEach(Array(NotificationEvent.allCases.enumerated()), id: \.element.id) { index, event in
@@ -701,6 +742,21 @@ private struct SoundSettingsContent: View {
                             event: event,
                             isEnabled: soundEnabledBinding(for: event),
                             selectedSound: soundBinding(for: event)
+                        ) {
+                            AppSettings.playSound(for: event)
+                        }
+
+                        if index < NotificationEvent.allCases.count - 1 {
+                            SettingsLineDivider()
+                        }
+                    }
+                }
+            } else if settings.soundThemeMode == .softSynth {
+                SoundEventSection(title: "阶段音效") {
+                    ForEach(Array(NotificationEvent.allCases.enumerated()), id: \.element.id) { index, event in
+                        SynthSoundEventLine(
+                            event: event,
+                            isEnabled: soundEnabledBinding(for: event)
                         ) {
                             AppSettings.playSound(for: event)
                         }
@@ -810,47 +866,38 @@ private struct SoundSettingsContent: View {
     }
 
     private func soundEnabledBinding(for event: NotificationEvent) -> Binding<Bool> {
-        switch event {
-        case .processingStarted:
-            return $settings.processingStartSoundEnabled
-        case .attentionRequired:
-            return $settings.attentionRequiredSoundEnabled
-        case .taskCompleted:
-            return $settings.taskCompletedSoundEnabled
-        case .taskError:
-            return $settings.taskErrorSoundEnabled
-        case .resourceLimit:
-            return $settings.resourceLimitSoundEnabled
-        }
+        Binding(
+            get: { AppSettings.isSoundEnabled(for: event) },
+            set: { AppSettings.setSoundEnabled($0, for: event) }
+        )
     }
 
     private func soundBinding(for event: NotificationEvent) -> Binding<NotificationSound> {
-        switch event {
-        case .processingStarted:
-            return $settings.processingStartSound
-        case .attentionRequired:
-            return $settings.attentionRequiredSound
-        case .taskCompleted:
-            return $settings.taskCompletedSound
-        case .taskError:
-            return $settings.taskErrorSound
-        case .resourceLimit:
-            return $settings.resourceLimitSound
-        }
+        Binding(
+            get: { AppSettings.sound(for: event) },
+            set: { AppSettings.setSound($0, for: event) }
+        )
     }
 
     private func bundledSoundBinding(for event: NotificationEvent) -> Binding<Island8BitSound> {
-        switch event {
-        case .processingStarted:
-            return $settings.island8BitProcessingStartSound
-        case .attentionRequired:
-            return $settings.island8BitAttentionRequiredSound
-        case .taskCompleted:
-            return $settings.island8BitTaskCompletedSound
-        case .taskError:
-            return $settings.island8BitTaskErrorSound
-        case .resourceLimit:
-            return $settings.island8BitResourceLimitSound
+        Binding(
+            get: { AppSettings.bundledSound(for: event) },
+            set: { AppSettings.setBundledSound($0, for: event) }
+        )
+    }
+
+    private func previewAllSoundStages() {
+        guard !isPreviewingAllStages else { return }
+        isPreviewingAllStages = true
+        AppSettings.prepareSoundPlayback()
+
+        Task { @MainActor in
+            for event in NotificationEvent.allCases {
+                guard !Task.isCancelled else { break }
+                AppSettings.playSound(for: event)
+                try? await Task.sleep(for: .milliseconds(720))
+            }
+            isPreviewingAllStages = false
         }
     }
 
@@ -2508,6 +2555,9 @@ private struct SettingsPanelContentView: View {
 
     var body: some View {
         ZStack {
+            AgentIslandThemeBackdrop()
+                .ignoresSafeArea()
+
             HStack(spacing: 0) {
                 sidebar
                     .frame(width: sidebarWidth)
@@ -2531,8 +2581,9 @@ private struct SettingsPanelContentView: View {
         }
         .background(panelBackgroundColor)
         .ignoresSafeArea()
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 4 : 18, style: .continuous))
         .preferredColorScheme(.dark)
+        .environment(\.agentIslandVisualTheme, settings.visualThemeMode)
         .environment(\.mascotAnimationsEnabled, arePreviewAnimationsActive)
         .onAppear {
             viewModel.refreshInitialState()
@@ -2587,7 +2638,7 @@ private struct SettingsPanelContentView: View {
             viewModel.refreshLocalizedState()
         }
         .alert(
-            AppLocalization.string("帮助提升 Ping Island 体验？"),
+            AppLocalization.string("帮助提升 AgentIsland 体验？"),
             isPresented: $showingAnalyticsConsentPrompt
         ) {
             Button(AppLocalization.string("暂不开启"), role: .cancel) {
@@ -2761,44 +2812,53 @@ private struct SettingsPanelContentView: View {
     }
 
     private var sidebar: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 18) {
-                if presentation == .window {
-                    sidebarWindowControls
-                }
+        VStack(spacing: 0) {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    if presentation == .window {
+                        sidebarWindowControls
+                    }
 
-                ForEach(sidebarSections) { section in
-                    VStack(alignment: .leading, spacing: 8) {
-                        if let title = section.title {
-                            Text(appLocalized: title)
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white.opacity(0.32))
-                                .padding(.horizontal, 12)
-                        }
+                    sidebarBrandHeader
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(section.categories) { category in
-                                Button {
-                                    selectSidebarCategory(category)
-                                } label: {
-                                    SidebarItemView(
-                                        category: category,
-                                        isSelected: selectedCategory == category,
-                                        showsNoticeDot: category == .integration && viewModel.hasIntegrationNotice
-                                    )
+                    ForEach(sidebarSections) { section in
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let title = section.title {
+                                Text(appLocalized: title)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.32))
+                                    .padding(.horizontal, 12)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(section.categories) { category in
+                                    Button {
+                                        selectSidebarCategory(category)
+                                    } label: {
+                                        SidebarItemView(
+                                            category: category,
+                                            isSelected: selectedCategory == category,
+                                            showsNoticeDot: category == .integration && viewModel.hasIntegrationNotice
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("settings.sidebar.\(category.rawValue)")
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("settings.sidebar.\(category.rawValue)")
                             }
                         }
                     }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 14)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 14)
+            .padding([.top, .horizontal], 8)
+
+            sidebarQuickActions
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 18)
         }
-        .padding(8)
         .background(
             UnevenRoundedRectangle(
                 topLeadingRadius: 24,
@@ -2860,6 +2920,80 @@ private struct SettingsPanelContentView: View {
                 .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.20), radius: 24, y: 14)
+    }
+
+    private var sidebarQuickActions: some View {
+        VStack(spacing: 8) {
+            Divider()
+                .overlay(Color.white.opacity(0.10))
+
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                HStack(spacing: 10) {
+                    AgentIslandThemeSymbol(
+                        systemName: "power",
+                        pixelGlyph: .deny,
+                        size: 13,
+                        color: Color(red: 1.0, green: 0.48, blue: 0.48)
+                    )
+                    Text(appLocalized: "退出 AgentIsland")
+                        .font(AgentIslandThemeFont.display(size: 12, theme: settings.visualThemeMode))
+                    Spacer(minLength: 0)
+                    Text("⌘Q")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.34))
+                }
+                .foregroundColor(Color(red: 1.0, green: 0.48, blue: 0.48))
+                .padding(.horizontal, 11)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 12, style: .continuous)
+                        .fill(Color.red.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 12, style: .continuous)
+                        .strokeBorder(Color.red.opacity(settings.visualThemeMode.isPixel ? 0.42 : 0.12), lineWidth: settings.visualThemeMode.isPixel ? 2 : 1)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("退出 AgentIsland")
+            .accessibilityIdentifier("settings.quit")
+        }
+    }
+
+    private var sidebarBrandHeader: some View {
+        HStack(spacing: 11) {
+            AgentIslandBrandIcon(size: 40, shadowRadius: 7)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("AgentIsland")
+                    .font(AgentIslandThemeFont.display(size: 14, theme: settings.visualThemeMode))
+                    .foregroundColor(.white.opacity(0.92))
+                Text("v\(appVersion)")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.38))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 14, style: .continuous)
+                .fill(Color.white.opacity(0.045))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: settings.visualThemeMode.isPixel ? 3 : 14, style: .continuous)
+                .strokeBorder(
+                    settings.visualThemeMode.isPixel
+                        ? Color(red: 0.30, green: 0.92, blue: 0.70).opacity(0.42)
+                        : Color.white.opacity(0.08),
+                    lineWidth: settings.visualThemeMode.isPixel ? 2 : 1
+                )
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("AgentIsland v\(appVersion)")
     }
 
     private var sidebarWindowControls: some View {
@@ -3062,6 +3196,10 @@ private struct SettingsPanelContentView: View {
 
     private var generalContent: some View {
         VStack(alignment: .leading, spacing: 18) {
+            SettingsSectionCard(title: "体验主题") {
+                AgentIslandVisualThemeSelector(theme: $settings.visualThemeMode)
+            }
+
             SettingsSectionCard(title: "系统") {
                 SettingsInfoLine(
                     title: "语言",
@@ -3661,6 +3799,21 @@ private struct SettingsPanelContentView: View {
     private var aboutContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             SettingsSectionCard(title: "应用信息") {
+                HStack(spacing: 14) {
+                    AgentIslandBrandIcon(size: 54, shadowRadius: 9)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("AgentIsland")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.94))
+                        Text(appLocalized: "统一查看、听见并返回你的 AI Agent。")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.48))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 3)
+                SettingsLineDivider()
                 SettingsValueLine(title: "版本", value: appVersion)
                 SettingsLineDivider()
                 SettingsValueLine(title: "构建", value: appBuild)
@@ -3709,7 +3862,7 @@ private struct SettingsPanelContentView: View {
 
                     SettingsActionLine(
                         title: "立即重启安装",
-                        subtitle: "不等待空闲，立即退出 Ping Island 并完成已下载的更新"
+                        subtitle: "不等待空闲，立即退出 AgentIsland 并完成已下载的更新"
                     ) {
                         updateManager.installAndRelaunch()
                     } accessory: {
@@ -4057,15 +4210,20 @@ private struct SidebarItemView: View {
     let isSelected: Bool
     var showsNoticeDot: Bool = false
 
+    @Environment(\.agentIslandVisualTheme) private var theme
+
     var body: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(isSelected ? 0.95 : 1))
+                AgentIslandThemeSymbol(
+                    systemName: category.icon,
+                    pixelGlyph: category.pixelGlyph,
+                    size: 14,
+                    color: .white.opacity(isSelected ? 0.95 : 1)
+                )
                     .frame(width: 24, height: 24)
                     .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: theme.isPixel ? 2 : 8, style: .continuous)
                             .fill(
                                 isSelected
                                 ? LinearGradient(
@@ -4086,7 +4244,7 @@ private struct SidebarItemView: View {
                                 )
                             )
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: theme.isPixel ? 2 : 8, style: .continuous))
 
                 if showsNoticeDot {
                     Circle()
@@ -4103,12 +4261,12 @@ private struct SidebarItemView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(appLocalized: category.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AgentIslandThemeFont.display(size: 13, theme: theme))
                     .foregroundColor(.white.opacity(isSelected ? 0.94 : 0.80))
                     .lineLimit(1)
 
                 Text(appLocalized: category.subtitle)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(AgentIslandThemeFont.body(size: 10, theme: theme))
                     .foregroundColor(.white.opacity(isSelected ? 0.60 : 0.42))
                     .lineLimit(1)
             }
@@ -4119,15 +4277,20 @@ private struct SidebarItemView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: theme.isPixel ? 3 : 16, style: .continuous)
                 .fill(isSelected ? Color.white.opacity(0.12) : Color.white.opacity(0.02))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(isSelected ? 0.10 : 0.04), lineWidth: 1)
+            RoundedRectangle(cornerRadius: theme.isPixel ? 3 : 16, style: .continuous)
+                .strokeBorder(
+                    theme.isPixel && isSelected
+                        ? Color(red: 0.30, green: 0.92, blue: 0.70).opacity(0.72)
+                        : Color.white.opacity(isSelected ? 0.10 : 0.04),
+                    lineWidth: theme.isPixel ? 2 : 1
+                )
         )
         .shadow(color: isSelected ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: theme.isPixel ? 3 : 16, style: .continuous))
     }
 }
 
@@ -4154,6 +4317,8 @@ private struct SettingsSectionCard<Content: View>: View {
     private let titleAccessory: AnyView?
     private let content: Content
 
+    @Environment(\.agentIslandVisualTheme) private var theme
+
     init(title: String, @ViewBuilder content: () -> Content) {
         self.title = title
         self.titleAccessory = nil
@@ -4174,7 +4339,7 @@ private struct SettingsSectionCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
                 Text(appLocalized: title)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(AgentIslandThemeFont.display(size: 15, theme: theme))
                     .foregroundColor(.white)
 
                 Spacer(minLength: 12)
@@ -4189,15 +4354,21 @@ private struct SettingsSectionCard<Content: View>: View {
                 content
             }
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: theme.isPixel ? 3 : 18, style: .continuous)
                     .fill(Color.white.opacity(0.045))
                     .overlay(
-                        SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .opacity(0.96)
+                        Group {
+                            if theme.isPixel {
+                                Color.black.opacity(0.36)
+                            } else {
+                                SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
+                                    .opacity(0.96)
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: theme.isPixel ? 3 : 18, style: .continuous))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(cornerRadius: theme.isPixel ? 3 : 18, style: .continuous)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -4212,8 +4383,13 @@ private struct SettingsSectionCard<Content: View>: View {
                     )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.11), lineWidth: 1)
+                RoundedRectangle(cornerRadius: theme.isPixel ? 3 : 18, style: .continuous)
+                    .strokeBorder(
+                        theme.isPixel
+                            ? Color(red: 0.30, green: 0.92, blue: 0.70).opacity(0.44)
+                            : Color.white.opacity(0.11),
+                        lineWidth: theme.isPixel ? 2 : 1
+                    )
             )
             .shadow(color: Color.black.opacity(0.16), radius: 18, y: 10)
         }
@@ -6338,10 +6514,111 @@ private struct FloatingPetSizeModePicker: View {
     }
 }
 
+struct AgentIslandVisualThemeSelector: View {
+    @Binding var theme: AgentIslandVisualTheme
+    @ObservedObject private var settings = AppSettings.shared
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(AgentIslandVisualTheme.allCases) { candidate in
+                Button {
+                    apply(candidate)
+                } label: {
+                    HStack(spacing: 12) {
+                        themePreview(candidate)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(appLocalized: candidate.title)
+                                .font(AgentIslandThemeFont.display(size: 13, theme: candidate))
+                                .foregroundColor(.white)
+                            Text(appLocalized: candidate.subtitle)
+                                .font(AgentIslandThemeFont.body(size: 10, theme: candidate))
+                                .foregroundColor(.white.opacity(0.58))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 4)
+
+                        Image(systemName: theme == candidate ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(theme == candidate ? accent(candidate) : .white.opacity(0.24))
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, minHeight: 76)
+                    .background(
+                        RoundedRectangle(cornerRadius: candidate.isPixel ? 4 : 16, style: .continuous)
+                            .fill(Color.white.opacity(theme == candidate ? 0.10 : 0.035))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: candidate.isPixel ? 4 : 16, style: .continuous)
+                            .strokeBorder(
+                                theme == candidate ? accent(candidate).opacity(0.72) : Color.white.opacity(0.08),
+                                lineWidth: candidate.isPixel ? 2 : 1
+                            )
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+    }
+
+    @ViewBuilder
+    private func themePreview(_ candidate: AgentIslandVisualTheme) -> some View {
+        if candidate.isPixel {
+            AgentIslandThemeSymbol(
+                systemName: "sparkles",
+                pixelGlyph: .sparkle,
+                size: 24,
+                color: accent(candidate)
+            )
+            .environment(\.agentIslandVisualTheme, candidate)
+            .frame(width: 38, height: 38)
+            .background(Rectangle().fill(Color.black.opacity(0.56)))
+            .overlay(Rectangle().strokeBorder(accent(candidate).opacity(0.72), lineWidth: 2))
+        } else {
+            Image(systemName: "sparkles")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [accent(candidate), Color(red: 0.76, green: 0.38, blue: 0.92)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+        }
+    }
+
+    private func apply(_ candidate: AgentIslandVisualTheme) {
+        theme = candidate
+        if candidate.isPixel {
+            settings.soundThemeMode = .island8Bit
+            AppSettings.prepareSoundPlayback()
+            AppSettings.playClientStartupSound()
+        } else if settings.soundThemeMode == .island8Bit {
+            settings.soundThemeMode = .softSynth
+            AppSettings.prepareSoundPlayback()
+            AppSettings.playOnboardingStageSound(0)
+        }
+    }
+
+    private func accent(_ candidate: AgentIslandVisualTheme) -> Color {
+        candidate.isPixel
+            ? Color(red: 0.30, green: 0.92, blue: 0.70)
+            : Color(red: 0.38, green: 0.66, blue: 1.0)
+    }
+}
+
 struct IslandSurfaceModeSelector: View {
     @Binding var mode: IslandSurfaceMode
     var title: String? = "展示模式"
-    var subtitle: String? = "选择 Ping Island 的主显示方式。你随时可以在设置里切换，并立即看到新的渲染效果。"
+    var subtitle: String? = "选择 AgentIsland 的主显示方式。你随时可以在设置里切换，并立即看到新的渲染效果。"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -7073,6 +7350,32 @@ private struct SoundPackEventLine: View {
                     .truncationMode(.middle)
             }
             .layoutPriority(1)
+
+            Spacer(minLength: 24)
+
+            HStack(spacing: 8) {
+                SoundPreviewButton(isEnabled: isEnabled, action: preview)
+
+                Toggle("", isOn: $isEnabled)
+                    .labelsHidden()
+                    .settingsCompactSwitch(scale: 0.88)
+                    .frame(width: 36, alignment: .center)
+            }
+            .frame(width: 72, alignment: .trailing)
+        }
+        .padding(.horizontal, 26)
+        .padding(.vertical, 18)
+    }
+}
+
+private struct SynthSoundEventLine: View {
+    let event: NotificationEvent
+    @Binding var isEnabled: Bool
+    let preview: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 18) {
+            SoundEventTextBlock(title: event.title, subtitle: event.subtitle)
 
             Spacer(minLength: 24)
 

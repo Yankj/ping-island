@@ -1,10 +1,9 @@
 <h1 align="center">
-  <img src="docs/images/ping-island-icon.svg" width="64" height="64" alt="Ping Island app icon" valign="middle">&nbsp;
-  Ping Island
+  <img src="PingIsland/Resources/Brand/AgentIslandIconMaster.png" width="64" height="64" alt="AgentIsland app icon" valign="middle">&nbsp;
+  AgentIsland
 </h1>
 <p align="center">
   <b>AI coding session monitor for the macOS menu bar</b><br>
-  <a href="https://erha19.github.io/">Website</a> •
   <a href="#lets-try-it">Try it</a> •
   <a href="#installation">Install</a> •
   <a href="#features">Features</a> •
@@ -16,29 +15,22 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/erha19/ping-island/releases">
-    <img src="https://img.shields.io/github/v/release/erha19/ping-island?display_name=tag&style=flat-square" alt="Latest release">
-  </a>
-  <a href="https://github.com/erha19/ping-island/releases">
-    <img src="https://img.shields.io/github/downloads/erha19/ping-island/total?style=flat-square" alt="Release downloads">
-  </a>
+  <img src="https://img.shields.io/badge/Status-Preview-8B5CF6?style=flat-square" alt="Preview release">
   <img src="https://img.shields.io/badge/macOS-14%2B-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="macOS 14 or later">
   <img src="https://img.shields.io/badge/Swift-6.1-FA7343?style=flat-square&logo=swift&logoColor=white" alt="Swift 6.1">
   <img src="https://img.shields.io/badge/Clients-12%2B-111827?style=flat-square" alt="Supports 12 plus client families">
   <img src="https://img.shields.io/badge/License-Apache%202.0-4F46E5?style=flat-square" alt="Apache 2.0 license">
 </p>
 
+> **Open-source attribution:** AgentIsland is a modified distribution based on [Ping Island](https://github.com/erha19/ping-island), licensed under the Apache License 2.0. Ping Island copyright and attribution are preserved in [NOTICE](NOTICE) and [LICENSE.md](LICENSE.md). AgentIsland is not an official Ping Island release. Product branding, onboarding, visual themes, iconography, and sound behavior have been changed; compatibility identifiers such as `PingIslandBridge` and legacy configuration paths remain where renaming would break existing hooks or user data.
+
 <p align="center">
-  <img src="docs/images/notch-panel.png" width="480" alt="Ping Island preview">
+  <img src="docs/images/notch-panel.png" width="480" alt="AgentIsland preview">
 </p>
 
 
 <p align="center">
   <sub>Watch active coding sessions, answer follow-up questions, and jump back to the right terminal or IDE window.</sub>
-</p>
-
-<p align="center">
-  <sub>Official website: <a href="https://erha19.github.io/ping-island/">erha19.github.io/ping-island</a></sub>
 </p>
 
 <p align="center">
@@ -66,30 +58,23 @@
 Detach the active pet from the notch and keep session status nearby while you work across other windows.
 
 <p align="center">
-  <img src="docs/images/demos/ping-island-ask-tool-demo.gif" width="800" alt="Ping Island detached pet interaction demo">
+  <img src="docs/images/demos/ping-island-ask-tool-demo.gif" width="800" alt="AgentIsland detached pet interaction demo">
 </p>
 
-On notch-screen Macs, Ping Island expands from the notch with session context and action controls when an agent needs attention.
+On notch-screen Macs, AgentIsland expands from the notch with session context and action controls when an agent needs attention.
 
 <p align="center">
-  <img src="docs/images/demos/ping-island-question-demo.gif" width="800" alt="Ping Island notch interaction demo">
+  <img src="docs/images/demos/ping-island-question-demo.gif" width="800" alt="AgentIsland notch interaction demo">
 </p>
 
 <a id="installation"></a>
 ## Installation
 
-### Install with Homebrew Cask
-
-```bash
-brew install --cask ping-island
-```
-
 ### Download a Release
 
-1. Visit the [official website](https://erha19.github.io/ping-island/) for the product overview and latest download link, or go straight to [Releases](https://github.com/erha19/ping-island/releases).
-2. Download the latest DMG.
-3. Move `Ping Island.app` into your Applications folder.
-4. Launch the app and start the clients you want Ping Island to monitor.
+1. Download the AgentIsland preview DMG or zip from this repository's release artifacts.
+2. Move `AgentIsland.app` into your Applications folder.
+3. Launch the app and start the clients you want AgentIsland to monitor.
 
 > On first launch, macOS may ask you to confirm the app or grant Accessibility / Apple Events permissions for focus features.
 
@@ -116,24 +101,24 @@ To create a locally shareable unsigned package for local testing:
 ```
 
 The script re-signs the built app bundle with a consistent ad-hoc signature before creating the `.dmg` and `.zip`, which helps embedded frameworks launch more reliably on another machine. The package is still unsigned for distribution and not notarized, so first launch may still require `Open` from Finder's context menu or manual quarantine removal.
-The generated files land in `releases/unsigned/` as `PingIsland-<version>.dmg` and `PingIsland-<version>.zip`.
+The generated files land in `releases/unsigned/` as `AgentIsland-<version>.dmg` and `AgentIsland-<version>.zip`.
 The DMG uses the repo-tracked installer artwork at `docs/images/ping-island-dmg-installer-background.png` by default; set `PING_ISLAND_DMG_BACKGROUND_SOURCE` if you want to preview a different background locally.
 
 To create signed and notarized release packages in GitHub Actions, configure the release secrets described in [docs/sparkle-release.md](docs/sparkle-release.md) and run `.github/workflows/release-packages.yml` against a `v*` tag or the manual workflow dispatch input. Official Homebrew Cask release notes are documented in [docs/homebrew-cask-release.md](docs/homebrew-cask-release.md).
 
-The same workflow also publishes a Linux `PingIslandBridge` asset that Ping Island can download when bootstrapping Linux SSH hosts.
+The same workflow also publishes a Linux `PingIslandBridge` asset that AgentIsland can download when bootstrapping Linux SSH hosts.
 
 For the full notarized release flow and the GitHub Releases backed Sparkle appcast setup, see [docs/sparkle-release.md](docs/sparkle-release.md).
 
-## What is Ping Island?
+## What is AgentIsland?
 
-Ping Island is a macOS menu bar app that expands into a compact session surface when your coding agents need attention. It listens to Claude-style hooks, Codex hooks, Gemini CLI hooks, Antigravity CLI plugin hooks, Hermes Agent plugin hooks, Pi Agent extension hooks, Qwen Code hooks, Kimi CLI hooks, OpenClaw internal hooks plus session transcripts, the Codex app-server, OpenCode plugins, and compatible IDE integrations so approvals, input requests, completions, and session summaries show up without babysitting terminal tabs.
+AgentIsland is a macOS menu bar app that expands into a compact session surface when your coding agents need attention. It listens to Claude-style hooks, Codex hooks, Gemini CLI hooks, Antigravity CLI plugin hooks, Hermes Agent plugin hooks, Pi Agent extension hooks, Qwen Code hooks, Kimi CLI hooks, OpenClaw internal hooks plus session transcripts, the Codex app-server, OpenCode plugins, and compatible IDE integrations so approvals, input requests, completions, and session summaries show up without babysitting terminal tabs.
 
-If you have seen [Vibe Island](https://vibeisland.app/), Ping Island is positioned as an independent open-source alternative in the same category: a native macOS notch/menu bar surface for monitoring and controlling AI coding sessions.
+AgentIsland builds on Ping Island's open-source monitoring and integration layer, while adding a distinct AgentIsland identity, an expanded onboarding sequence, semantic sound stages, a polished glass theme, and an optional Pixel Landing visual/audio theme. It is independently maintained as a modified distribution and does not include Vibe Island proprietary code or media.
 
 ## Features
 
-Ping Island focuses on the moments that actually interrupt coding flow, then keeps them visible and actionable from a native macOS notch surface.
+AgentIsland focuses on the moments that actually interrupt coding flow, then keeps them visible and actionable from a native macOS notch surface.
 
 - **Attention-first UI** - Stay compact until a session needs approval, input, review, or intervention.
 - **Act from the notch** - Approve tools, deny requests, and answer follow-up prompts without hunting through tabs.
@@ -143,7 +128,7 @@ Ping Island focuses on the moments that actually interrupt coding flow, then kee
 - **Multi-agent coverage** - Track Claude Code, Codex, Gemini CLI, Antigravity CLI, Hermes Agent, Pi Agent, Qwen Code, Kimi CLI, OpenClaw, OpenCode, Cursor, Qoder, Qoder CN, CodeBuddy, WorkBuddy, GitHub Copilot, and other compatible sessions in one place.
 - **OpenClaw gateway support** - Follow OpenClaw sessions from managed internal hooks, then refill the conversation from OpenClaw's local session transcripts so the Island UI can show the actual back-and-forth instead of a single inbound message.
 - **Codex hook + app-server sync** - Support Codex CLI hooks, live app-server threads, and rollout parsing fallback when needed.
-- **Custom sounds** - Pick per-event macOS sounds or import local sound packs for your own notification style.
+- **Semantic sound cues** - Use responsive soft-synth cues, pick per-event macOS or 8-bit sounds, or import local sound packs for your own notification style.
 - **Custom agent mascots** - Give each client its own animated mascot override across the notch, session list, and hover UI.
 - **Buddy detach in v0.5.0+** - Drag the active Buddy out of the notch so it can stay nearby as an independent floating companion.
 - **Hermes courier-fox mascot** - Hermes Agent uses a gold courier fox with a winged helmet and satchel so plugin-hook sessions stay visually distinct from the Claude/Qwen family.
@@ -199,7 +184,7 @@ If `PingIslandUITests-Runner` stays suspended on macOS, run the UI tests from Xc
 
 ## Settings
 
-Ping Island currently ships a 4-category settings panel:
+AgentIsland currently ships a 4-category settings panel:
 
 - **General** - launch at login and baseline app behavior
 - **Display** - notch display target and placement behavior
@@ -208,9 +193,10 @@ Ping Island currently ships a 4-category settings panel:
 
 ## Custom Sounds
 
-Ping Island currently supports three sound modes under `Settings -> Sound`:
+AgentIsland currently supports four sound modes under `Settings -> Sound`:
 
 - **System sounds** - choose a macOS sound for each event.
+- **Soft Synth** - use short, normalized real-time cues designed around each event's meaning.
 - **Built-in 8-bit** - use Island's bundled retro sound set, including the fixed client startup sound.
 - **Sound pack** - load a local OpenPeon / CESP-compatible pack from disk.
 
@@ -219,6 +205,7 @@ Ping Island currently supports three sound modes under `Settings -> Sound`:
 1. Open `Settings -> Sound`.
 2. Turn on `Enable sounds`.
 3. Pick the mode you want:
+   - `Soft Synth` for the responsive default semantic cues.
    - `System sounds` if you just want a different macOS sound per event.
    - `Sound pack` if you want fully custom audio files.
 4. Preview each event with the play button and leave only the event toggles you want enabled.
@@ -230,7 +217,7 @@ Ping Island currently supports three sound modes under `Settings -> Sound`:
 3. Choose a folder that contains `openpeon.json`.
 4. Pick the imported pack from the `Sound pack` dropdown.
 
-Ping Island also auto-discovers packs placed under `~/.openpeon/packs` and `~/.claude/hooks/peon-ping/packs`.
+AgentIsland also auto-discovers packs placed under `~/.openpeon/packs` and `~/.claude/hooks/peon-ping/packs`.
 
 ### Minimal sound pack layout
 
@@ -277,16 +264,16 @@ my-pack/
 - `Task error` checks `task.error`.
 - `Resource limit` checks `resource.limit`.
 
-Release builds can also publish a Linux `PingIslandBridge` artifact alongside the macOS app packages, which Ping Island uses when bootstrapping remote SSH hosts that are not running macOS.
+Release builds can also publish a Linux `PingIslandBridge` artifact alongside the macOS app packages, which AgentIsland uses when bootstrapping remote SSH hosts that are not running macOS.
 
-Sound packs can use `.wav`, `.mp3`, or `.ogg` files. If a selected pack does not provide a matching category for an event, Ping Island falls back to the macOS system sound selected for that event.
+Sound packs can use `.wav`, `.mp3`, or `.ogg` files. If a selected pack does not provide a matching category for an event, AgentIsland falls back to the macOS system sound selected for that event.
 
 ## How It Works
 
 ```text
 Claude / Codex / Gemini CLI / Antigravity CLI / Hermes Agent / Pi Agent / Qwen Code / Kimi CLI / OpenCode / Cursor / Qoder / Qoder CN / CodeBuddy / WorkBuddy / Copilot / ...
   -> hook or app-server event
-    -> Ping Island monitor + normalization layer
+    -> AgentIsland monitor + normalization layer
       -> SessionStore
         -> SessionMonitor / NotchViewModel
           -> notch, list, hover preview, completion popup
@@ -297,29 +284,29 @@ Implementation details worth knowing:
 - Claude-family tools enter through managed hook files plus the embedded `PingIslandBridge` launcher.
 - Codex sessions can come from hook events or the live `codex app-server` websocket monitor.
 - Gemini CLI hooks are installed into `~/.gemini/settings.json`; tool matchers use Gemini's regex-based hook matcher syntax.
-- Antigravity CLI uses a generated native plugin under `~/.gemini/antigravity-cli/plugins/ping-island/`; Ping Island returns `ask` from its observational `PreToolUse` hook so Antigravity's own permission engine remains authoritative.
+- Antigravity CLI uses a generated native plugin under `~/.gemini/antigravity-cli/plugins/ping-island/`; AgentIsland returns `ask` from its observational `PreToolUse` hook so Antigravity's own permission engine remains authoritative.
 - Pi Agent is wired through a generated TypeScript extension under `~/.pi/agent/extensions/ping_island/` and forwards events through the Claude-compatible bridge with Pi-specific client metadata.
 - Qwen Code hooks are installed into `~/.qwen/settings.json`; the bridge follows the official event names and uses `Stop` / `SessionEnd` / `Notification` messages to surface popup-ready summaries in Island.
-- Kimi CLI hooks are installed into `~/.kimi/config.toml`; Ping Island preserves unrelated TOML content and maps Kimi `Stop` to turn completion while `SessionEnd` closes the session.
+- Kimi CLI hooks are installed into `~/.kimi/config.toml`; AgentIsland preserves unrelated TOML content and maps Kimi `Stop` to turn completion while `SessionEnd` closes the session.
 - OpenCode is wired through a generated plugin file under `~/.config/opencode/plugins/` and enabled from the documented global config at `~/.config/opencode/opencode.json`; legacy `config.json` entries are still recognized for cleanup.
-- Remote SSH hosts can bootstrap `PingIslandBridge`, rewrite remote Claude-compatible hooks to target that bridge, and forward remote events back into the local Ping Island UI.
+- Remote SSH hosts can bootstrap `PingIslandBridge`, rewrite remote Claude-compatible hooks to target that bridge, and forward remote events back into the local AgentIsland UI.
 - Focus routing spans iTerm2, Ghostty, Terminal.app, tmux, and VS Code-compatible IDE extensions.
 
 ## Requirements
 
 - macOS 14.0 or later
 - Best experience on MacBooks with a notch, but external displays are supported too
-- Install whichever CLI or desktop clients you want Ping Island to monitor
+- Install whichever CLI or desktop clients you want AgentIsland to monitor
 
 ## Contributors
 
-Thanks to everyone who has helped shape Ping Island through code, issues, ideas, testing, docs, design feedback, and release validation.
+Thanks to everyone who has helped shape AgentIsland through code, issues, ideas, testing, docs, design feedback, and release validation.
 
 See the full contributor history on the [GitHub contributors graph](https://github.com/erha19/ping-island/graphs/contributors).
 
 ## Acknowledgments
 
-Ping Island follows the lineage of notch-first agent monitors such as [claude-island](https://github.com/farouqaldori/claude-island), and adapts that idea into a broader multi-client session surface with hooks, app-server sync, and IDE routing.
+AgentIsland follows the lineage of notch-first agent monitors such as [claude-island](https://github.com/farouqaldori/claude-island), and adapts that idea into a broader multi-client session surface with hooks, app-server sync, and IDE routing.
 
 ## License
 

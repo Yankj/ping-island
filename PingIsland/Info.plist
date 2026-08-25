@@ -3,33 +3,37 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Ping Island</string>
+    <string>AgentIsland</string>
     <key>CFBundleDisplayName</key>
-    <string>Ping Island</string>
+    <string>AgentIsland</string>
     <key>CFBundleIdentifier</key>
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>CFBundleShortVersionString</key>
     <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleIconFile</key>
+    <string>AgentIslandIcon</string>
+    <key>AgentIslandOnboardingExperience</key>
+    <string>agentisland-welcome-2026-08-v3</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Ping Island uses Apple Events to focus the matching iTerm, Ghostty, cmux, or Terminal window for a session.</string>
+    <string>AgentIsland uses Apple Events to focus the matching iTerm, Ghostty, cmux, or Terminal window for a session.</string>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright 2025. All rights reserved.</string>
-    <key>PINGTelemetryDailyEventLimit</key>
-    <string>$(PING_ISLAND_TELEMETRY_DAILY_EVENT_LIMIT)</string>
-    <key>PINGTelemetrySLSHost</key>
-    <string>$(PING_ISLAND_TELEMETRY_SLS_HOST)</string>
-    <key>PINGTelemetrySLSLogstore</key>
-    <string>$(PING_ISLAND_TELEMETRY_SLS_LOGSTORE)</string>
-    <key>PINGTelemetrySLSProject</key>
-    <string>$(PING_ISLAND_TELEMETRY_SLS_PROJECT)</string>
-    <key>PINGTelemetrySLSSource</key>
-    <string>$(PING_ISLAND_TELEMETRY_SLS_SOURCE)</string>
-    <key>PINGTelemetrySLSTopic</key>
-    <string>$(PING_ISLAND_TELEMETRY_SLS_TOPIC)</string>
+    <string>Copyright © 2026 AgentIsland contributors. Based on Ping Island, Apache-2.0.</string>
+    <key>AgentIslandTelemetryDailyEventLimit</key>
+    <string>$(AGENT_ISLAND_TELEMETRY_DAILY_EVENT_LIMIT)</string>
+    <key>AgentIslandTelemetrySLSHost</key>
+    <string>$(AGENT_ISLAND_TELEMETRY_SLS_HOST)</string>
+    <key>AgentIslandTelemetrySLSLogstore</key>
+    <string>$(AGENT_ISLAND_TELEMETRY_SLS_LOGSTORE)</string>
+    <key>AgentIslandTelemetrySLSProject</key>
+    <string>$(AGENT_ISLAND_TELEMETRY_SLS_PROJECT)</string>
+    <key>AgentIslandTelemetrySLSSource</key>
+    <string>$(AGENT_ISLAND_TELEMETRY_SLS_SOURCE)</string>
+    <key>AgentIslandTelemetrySLSTopic</key>
+    <string>$(AGENT_ISLAND_TELEMETRY_SLS_TOPIC)</string>
 
     <key>SUAllowsAutomaticUpdates</key>
     <true/>

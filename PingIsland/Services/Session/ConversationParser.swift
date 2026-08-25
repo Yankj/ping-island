@@ -26,7 +26,7 @@ actor ConversationParser {
     }
 
     /// Logger for conversation parser (nonisolated static for cross-context access)
-    nonisolated static let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Parser")
+    nonisolated static let logger = Logger(subsystem: "com.agentisland.app", category: "Parser")
 
     /// Cache of parsed conversation info, keyed by session file path
     private var cache: [String: CachedInfo] = [:]

@@ -33,7 +33,7 @@ struct IslandOpenedContentView: View {
     }
 
     private var hoverPreviewSessions: [SessionState] {
-        IslandExpandedRouteResolver.activePreviewSessions(from: sessionMonitor.instances)
+        IslandExpandedRouteResolver.compactPreviewSessions(from: sessionMonitor.instances)
     }
 
     @ViewBuilder

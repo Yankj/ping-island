@@ -10,7 +10,7 @@
 import Foundation
 import os.log
 
-private let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "ClaudeDesktop")
+private let logger = Logger(subsystem: "com.agentisland.app", category: "ClaudeDesktop")
 
 /// Sessions idle for longer than this threshold are skipped on startup.
 private let activeWindowSeconds: TimeInterval = 4 * 60 * 60  // 4 hours
@@ -168,7 +168,7 @@ actor ClaudeDesktopWatcher {
         await SessionStore.shared.process(.desktopSessionDiscovered(info))
 
         // Advance ConversationParser's internal offset to end-of-file without emitting
-        // events, so we only pick up content written after Ping Island started watching.
+        // events, so we only pick up content written after AgentIsland started watching.
         await ConversationParser.shared.resetState(for: metadata.cliSessionId)
         _ = await ConversationParser.shared.parseIncremental(
             sessionId: metadata.cliSessionId,

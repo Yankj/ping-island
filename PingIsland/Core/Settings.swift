@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import AVFAudio
 import Combine
 import Foundation
 
@@ -84,46 +85,160 @@ enum NotificationSound: String, CaseIterable {
     }
 }
 
-final class SoundPlaybackCoordinator {
-    private var activeSound: NSSound?
+final class SoundPlaybackCoordinator: NSObject, AVAudioPlayerDelegate, NSSoundDelegate {
+    private var activeSystemSound: NSSound?
+    private var activeFilePlayer: AVAudioPlayer?
+    private var filePlayers: [URL: AVAudioPlayer] = [:]
 
     @discardableResult
     func play(_ sound: NSSound, volume: Float) -> Bool {
-        stopActiveSound(except: sound)
+        stopActiveFilePlayer()
+        stopActiveSystemSound(except: sound)
 
-        if isActiveSound(sound), sound.isPlaying {
+        if isActiveSystemSound(sound), sound.isPlaying {
             sound.stop()
         }
 
+        sound.delegate = self
         sound.volume = volume
         let didPlay = sound.play()
-        activeSound = didPlay ? sound : nil
+        activeSystemSound = didPlay ? sound : nil
         return didPlay
     }
 
-    func clearIfActive(_ sound: NSSound) {
-        guard isActiveSound(sound) else { return }
-        activeSound = nil
-    }
-
-    private func stopActiveSound(except sound: NSSound) {
-        guard let activeSound, !isSameSound(activeSound, sound) else { return }
-        if activeSound.isPlaying {
-            activeSound.stop()
+    @discardableResult
+    func play(contentsOf url: URL, volume: Float) -> Bool {
+        let standardizedURL = url.standardizedFileURL
+        guard let player = preparedPlayer(for: standardizedURL) else {
+            guard let fallback = NSSound(contentsOf: standardizedURL, byReference: false) else {
+                return false
+            }
+            return play(fallback, volume: volume)
         }
-        self.activeSound = nil
+
+        stopActiveSystemSound()
+        stopActiveFilePlayer(except: player)
+
+        if player.isPlaying {
+            player.stop()
+        }
+        player.currentTime = 0
+        player.volume = volume
+        player.prepareToPlay()
+        let didPlay = player.play()
+        activeFilePlayer = didPlay ? player : nil
+        return didPlay
     }
 
-    private func isActiveSound(_ sound: NSSound) -> Bool {
-        guard let activeSound else { return false }
-        return isSameSound(activeSound, sound)
+    func preload(contentsOf urls: [URL]) {
+        for url in urls {
+            _ = preparedPlayer(for: url.standardizedFileURL)
+        }
     }
 
-    private func isSameSound(_ lhs: NSSound, _ rhs: NSSound) -> Bool { lhs === rhs }
+    func clearIfActive(_ sound: NSSound) {
+        guard isActiveSystemSound(sound) else { return }
+        activeSystemSound = nil
+    }
+
+    func sound(_ sound: NSSound, didFinishPlaying flag: Bool) {
+        clearIfActive(sound)
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        guard activeFilePlayer === player else { return }
+        activeFilePlayer = nil
+    }
+
+    private func preparedPlayer(for url: URL) -> AVAudioPlayer? {
+        if let cached = filePlayers[url] {
+            return cached
+        }
+
+        guard let player = try? AVAudioPlayer(contentsOf: url) else {
+            return nil
+        }
+        player.delegate = self
+        player.numberOfLoops = 0
+        player.prepareToPlay()
+        filePlayers[url] = player
+        return player
+    }
+
+    private func stopActiveSystemSound(except sound: NSSound? = nil) {
+        guard let activeSystemSound else { return }
+        if let sound, activeSystemSound === sound {
+            return
+        }
+        if activeSystemSound.isPlaying {
+            activeSystemSound.stop()
+        }
+        activeSystemSound.delegate = nil
+        self.activeSystemSound = nil
+    }
+
+    private func stopActiveFilePlayer(except player: AVAudioPlayer? = nil) {
+        guard let activeFilePlayer else { return }
+        if let player, activeFilePlayer === player {
+            return
+        }
+        if activeFilePlayer.isPlaying {
+            activeFilePlayer.stop()
+        }
+        self.activeFilePlayer = nil
+    }
+
+    private func isActiveSystemSound(_ sound: NSSound) -> Bool {
+        activeSystemSound === sound
+    }
 }
 
 enum AppSoundPlayback {
     static let shared = SoundPlaybackCoordinator()
+}
+
+@MainActor
+final class NotificationSoundGate {
+    static let shared = NotificationSoundGate()
+
+    private var lastPlayedAtByEvent: [NotificationEvent: Date] = [:]
+
+    func shouldPlay(_ event: NotificationEvent, at now: Date = Date()) -> Bool {
+        if let lastPlayedAt = lastPlayedAtByEvent[event],
+           now.timeIntervalSince(lastPlayedAt) < Self.cooldown(for: event) {
+            return false
+        }
+
+        lastPlayedAtByEvent[event] = now
+        return true
+    }
+
+    func reset() {
+        lastPlayedAtByEvent.removeAll()
+    }
+
+    nonisolated static func cooldown(for event: NotificationEvent) -> TimeInterval {
+        switch event {
+        case .sessionStarted:
+            return 1.0
+        case .processingStarted:
+            return 0.25
+        case .attentionRequired:
+            return 0.75
+        case .taskCompleted:
+            return 0.6
+        case .taskError:
+            return 0.5
+        case .resourceLimit:
+            return 1.0
+        case .idleReminder:
+            return 60
+        case .usageWarning, .usageReset:
+            return 30
+        case .rapidSubmit:
+            return 10
+        }
+    }
 }
 
 enum UsageValueMode: String, CaseIterable, Identifiable {
@@ -420,6 +535,7 @@ final class AppSettingsStore: ObservableObject {
         static let island8BitTaskErrorSound = "island8BitTaskErrorSound"
         static let island8BitResourceLimitSound = "island8BitResourceLimitSound"
         static let soundThemeMode = "soundThemeMode"
+        static let visualThemeMode = "visualThemeMode"
         static let island8BitStartSoundMigrated = "island8BitStartSoundMigrated"
         static let selectedSoundPackPath = "selectedSoundPackPath"
         static let hideInFullscreen = "hideInFullscreen"
@@ -646,6 +762,13 @@ final class AppSettingsStore: ObservableObject {
             guard !isBootstrapping else { return }
             defaults.set(soundThemeMode.rawValue, forKey: Keys.soundThemeMode)
             applyIsland8BitStartSoundMigrationIfNeeded(for: soundThemeMode)
+        }
+    }
+
+    @Published var visualThemeMode: AgentIslandVisualTheme {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(visualThemeMode.rawValue, forKey: Keys.visualThemeMode)
         }
     }
 
@@ -1279,6 +1402,118 @@ final class AppSettingsStore: ObservableObject {
         min(max(width, minimumNotchModuleWidth), maximumNotchModuleWidth)
     }
 
+    private func eventPreferenceKey(_ prefix: String, event: NotificationEvent) -> String {
+        "AgentIsland.sound.\(prefix).\(event.rawValue)"
+    }
+
+    func isSoundEnabled(for event: NotificationEvent) -> Bool {
+        switch event {
+        case .processingStarted:
+            return processingStartSoundEnabled
+        case .attentionRequired:
+            return attentionRequiredSoundEnabled
+        case .taskCompleted:
+            return taskCompletedSoundEnabled
+        case .taskError:
+            return taskErrorSoundEnabled
+        case .resourceLimit:
+            return resourceLimitSoundEnabled
+        case .sessionStarted, .idleReminder, .usageWarning, .usageReset, .rapidSubmit:
+            let key = eventPreferenceKey("enabled", event: event)
+            return defaults.object(forKey: key) == nil ? true : defaults.bool(forKey: key)
+        }
+    }
+
+    func setSoundEnabled(_ enabled: Bool, for event: NotificationEvent) {
+        switch event {
+        case .processingStarted:
+            processingStartSoundEnabled = enabled
+        case .attentionRequired:
+            attentionRequiredSoundEnabled = enabled
+        case .taskCompleted:
+            taskCompletedSoundEnabled = enabled
+        case .taskError:
+            taskErrorSoundEnabled = enabled
+        case .resourceLimit:
+            resourceLimitSoundEnabled = enabled
+        case .sessionStarted, .idleReminder, .usageWarning, .usageReset, .rapidSubmit:
+            objectWillChange.send()
+            defaults.set(enabled, forKey: eventPreferenceKey("enabled", event: event))
+        }
+    }
+
+    func systemSound(for event: NotificationEvent) -> NotificationSound {
+        switch event {
+        case .processingStarted:
+            return processingStartSound
+        case .attentionRequired:
+            return attentionRequiredSound
+        case .taskCompleted:
+            return taskCompletedSound
+        case .taskError:
+            return taskErrorSound
+        case .resourceLimit:
+            return resourceLimitSound
+        case .sessionStarted, .idleReminder, .usageWarning, .usageReset, .rapidSubmit:
+            let rawValue = defaults.string(forKey: eventPreferenceKey("system", event: event)) ?? ""
+            return NotificationSound(rawValue: rawValue) ?? event.defaultSound
+        }
+    }
+
+    func setSystemSound(_ sound: NotificationSound, for event: NotificationEvent) {
+        switch event {
+        case .processingStarted:
+            processingStartSound = sound
+        case .attentionRequired:
+            attentionRequiredSound = sound
+        case .taskCompleted:
+            taskCompletedSound = sound
+        case .taskError:
+            taskErrorSound = sound
+        case .resourceLimit:
+            resourceLimitSound = sound
+        case .sessionStarted, .idleReminder, .usageWarning, .usageReset, .rapidSubmit:
+            objectWillChange.send()
+            defaults.set(sound.rawValue, forKey: eventPreferenceKey("system", event: event))
+        }
+    }
+
+    func bundledSound(for event: NotificationEvent) -> Island8BitSound {
+        switch event {
+        case .processingStarted:
+            return island8BitProcessingStartSound
+        case .attentionRequired:
+            return island8BitAttentionRequiredSound
+        case .taskCompleted:
+            return island8BitTaskCompletedSound
+        case .taskError:
+            return island8BitTaskErrorSound
+        case .resourceLimit:
+            return island8BitResourceLimitSound
+        case .sessionStarted, .idleReminder, .usageWarning, .usageReset, .rapidSubmit:
+            let rawValue = defaults.string(forKey: eventPreferenceKey("bundled", event: event)) ?? ""
+            return Island8BitSound(rawValue: rawValue) ?? event.defaultBundledSound
+        }
+    }
+
+    func setBundledSound(_ sound: Island8BitSound, for event: NotificationEvent) {
+        switch event {
+        case .processingStarted:
+            island8BitProcessingStartSound = sound
+        case .attentionRequired:
+            island8BitAttentionRequiredSound = sound
+        case .taskCompleted:
+            island8BitTaskCompletedSound = sound
+        case .taskError:
+            island8BitTaskErrorSound = sound
+        case .resourceLimit:
+            island8BitResourceLimitSound = sound
+        case .sessionStarted, .idleReminder, .usageWarning, .usageReset, .rapidSubmit:
+            objectWillChange.send()
+            defaults.set(sound.rawValue, forKey: eventPreferenceKey("bundled", event: event))
+        }
+    }
+
     private func applyIsland8BitStartSoundMigrationIfNeeded(for mode: SoundThemeMode) {
         guard mode == .island8Bit else { return }
         guard !containsPersistedValue(forKey: Keys.island8BitStartSoundMigrated) else { return }
@@ -1309,7 +1544,11 @@ final class AppSettingsStore: ObservableObject {
         let soundThemeModeRaw = defaults.string(forKey: Keys.soundThemeMode)
         let resolvedSoundThemeMode = SoundThemeMode(
             rawValue: soundThemeModeRaw ?? ""
-        ) ?? .island8Bit
+        ) ?? .softSynth
+        let visualThemeModeRaw = defaults.string(forKey: Keys.visualThemeMode)
+        let resolvedVisualThemeMode = AgentIslandVisualTheme(
+            rawValue: visualThemeModeRaw ?? ""
+        ) ?? .radiantGlass
         let subagentVisibilityModeRaw = defaults.string(forKey: Keys.subagentVisibilityMode)
             ?? defaults.string(forKey: Keys.legacyCodexSubagentVisibilityMode)
         let temporarilyMuteNotificationsUntilTimestamp = persistedKeys.contains(Keys.temporarilyMuteNotificationsUntil)
@@ -1419,6 +1658,7 @@ final class AppSettingsStore: ObservableObject {
             rawValue: defaults.string(forKey: Keys.island8BitResourceLimitSound) ?? ""
         ) ?? .completeDing)
         _soundThemeMode = Published(initialValue: resolvedSoundThemeMode)
+        _visualThemeMode = Published(initialValue: resolvedVisualThemeMode)
         _selectedSoundPackPath = Published(initialValue: defaults.string(forKey: Keys.selectedSoundPackPath) ?? "")
         _hideInFullscreen = Published(initialValue: Self.boolValue(
             from: defaults,
@@ -1638,7 +1878,7 @@ final class AppSettingsStore: ObservableObject {
 @MainActor
 enum AppSettings {
     static var shared: AppSettingsStore { AppSettingsStore.shared }
-    private static var bundledSoundCache: [String: NSSound] = [:]
+    private static var bundledSoundURLCache: [String: URL] = [:]
     nonisolated static let defaultSettingsWindowSize = CGSize(width: 880, height: 520)
     nonisolated static let minimumSettingsWindowSize = CGSize(width: 820, height: 500)
     nonisolated static let maximumSettingsWindowSize = CGSize(width: 1440, height: 1100)
@@ -1672,6 +1912,11 @@ enum AppSettings {
     static var soundThemeMode: SoundThemeMode {
         get { shared.soundThemeMode }
         set { shared.soundThemeMode = newValue }
+    }
+
+    static var visualThemeMode: AgentIslandVisualTheme {
+        get { shared.visualThemeMode }
+        set { shared.visualThemeMode = newValue }
     }
 
     static var selectedSoundPackPath: String {
@@ -1842,93 +2087,27 @@ enum AppSettings {
     }
 
     static func isSoundEnabled(for event: NotificationEvent) -> Bool {
-        switch event {
-        case .processingStarted:
-            return shared.processingStartSoundEnabled
-        case .attentionRequired:
-            return shared.attentionRequiredSoundEnabled
-        case .taskCompleted:
-            return shared.taskCompletedSoundEnabled
-        case .taskError:
-            return shared.taskErrorSoundEnabled
-        case .resourceLimit:
-            return shared.resourceLimitSoundEnabled
-        }
+        shared.isSoundEnabled(for: event)
     }
 
     static func setSoundEnabled(_ enabled: Bool, for event: NotificationEvent) {
-        switch event {
-        case .processingStarted:
-            shared.processingStartSoundEnabled = enabled
-        case .attentionRequired:
-            shared.attentionRequiredSoundEnabled = enabled
-        case .taskCompleted:
-            shared.taskCompletedSoundEnabled = enabled
-        case .taskError:
-            shared.taskErrorSoundEnabled = enabled
-        case .resourceLimit:
-            shared.resourceLimitSoundEnabled = enabled
-        }
+        shared.setSoundEnabled(enabled, for: event)
     }
 
     static func sound(for event: NotificationEvent) -> NotificationSound {
-        switch event {
-        case .processingStarted:
-            return shared.processingStartSound
-        case .attentionRequired:
-            return shared.attentionRequiredSound
-        case .taskCompleted:
-            return shared.taskCompletedSound
-        case .taskError:
-            return shared.taskErrorSound
-        case .resourceLimit:
-            return shared.resourceLimitSound
-        }
+        shared.systemSound(for: event)
     }
 
     static func setSound(_ sound: NotificationSound, for event: NotificationEvent) {
-        switch event {
-        case .processingStarted:
-            shared.processingStartSound = sound
-        case .attentionRequired:
-            shared.attentionRequiredSound = sound
-        case .taskCompleted:
-            shared.taskCompletedSound = sound
-        case .taskError:
-            shared.taskErrorSound = sound
-        case .resourceLimit:
-            shared.resourceLimitSound = sound
-        }
+        shared.setSystemSound(sound, for: event)
     }
 
     static func bundledSound(for event: NotificationEvent) -> Island8BitSound {
-        switch event {
-        case .processingStarted:
-            return shared.island8BitProcessingStartSound
-        case .attentionRequired:
-            return shared.island8BitAttentionRequiredSound
-        case .taskCompleted:
-            return shared.island8BitTaskCompletedSound
-        case .taskError:
-            return shared.island8BitTaskErrorSound
-        case .resourceLimit:
-            return shared.island8BitResourceLimitSound
-        }
+        shared.bundledSound(for: event)
     }
 
     static func setBundledSound(_ sound: Island8BitSound, for event: NotificationEvent) {
-        switch event {
-        case .processingStarted:
-            shared.island8BitProcessingStartSound = sound
-        case .attentionRequired:
-            shared.island8BitAttentionRequiredSound = sound
-        case .taskCompleted:
-            shared.island8BitTaskCompletedSound = sound
-        case .taskError:
-            shared.island8BitTaskErrorSound = sound
-        case .resourceLimit:
-            shared.island8BitResourceLimitSound = sound
-        }
+        shared.setBundledSound(sound, for: event)
     }
 
     static func playSound(named soundName: String?) {
@@ -1938,7 +2117,7 @@ enum AppSettings {
     }
 
     static func playClientStartupSound() {
-        guard soundEnabled else { return }
+        guard soundEnabled, soundThemeMode == .island8Bit else { return }
         playBundledSound(named: Island8BitSound.powerUp.rawValue)
     }
 
@@ -1947,18 +2126,37 @@ enum AppSettings {
         playBundledSound(named: Island8BitSound.winJingle.rawValue)
     }
 
+    static func playOnboardingCeremonySound() {
+        guard soundEnabled else { return }
+        AppSoundSynthesizer.shared.playOnboardingCeremony(volume: Float(soundVolume))
+    }
+
+    static func playOnboardingStageSound(_ stage: Int) {
+        guard soundEnabled else { return }
+        AppSoundSynthesizer.shared.playOnboardingStage(stage, volume: Float(soundVolume))
+    }
+
+    static func stopOnboardingCeremonySound() {
+        AppSoundSynthesizer.shared.stopOnboardingCeremony()
+    }
+
     static func playDetachedCapsuleSound() {
         guard soundEnabled else { return }
         playBundledSound(named: "bubbles_pop")
     }
 
-    static func playSound(for event: NotificationEvent) {
+    static func playSound(for event: NotificationEvent, respectsDebounce: Bool = false) {
         guard soundEnabled, isSoundEnabled(for: event) else { return }
         guard !areReminderNotificationsSuppressed else { return }
+        if respectsDebounce, !NotificationSoundGate.shared.shouldPlay(event) {
+            return
+        }
 
         switch soundThemeMode {
         case .builtIn:
             playSound(named: sound(for: event).soundName)
+        case .softSynth:
+            AppSoundSynthesizer.shared.play(event: event, volume: Float(soundVolume))
         case .island8Bit:
             playBundledSound(named: Self.bundledSound(for: event).rawValue)
         case .soundPack:
@@ -1978,24 +2176,42 @@ enum AppSettings {
         playSound(named: (sound ?? notificationSound).soundName)
     }
 
-    private static func playBundledSound(named resourceName: String) {
-        guard let sound = bundledSoundCache[resourceName] ?? loadBundledSound(named: resourceName) else {
-            return
+    static func prepareSoundPlayback() {
+        switch soundThemeMode {
+        case .softSynth:
+            AppSoundSynthesizer.shared.prepare()
+        case .island8Bit:
+            let urls = Island8BitSound.allCases.compactMap {
+                bundledSoundURL(named: $0.rawValue)
+            }
+            AppSoundPlayback.shared.preload(contentsOf: urls)
+        case .builtIn, .soundPack:
+            break
         }
-
-        bundledSoundCache[resourceName] = sound
-        AppSoundPlayback.shared.play(sound, volume: Float(soundVolume))
     }
 
-    private static func loadBundledSound(named resourceName: String) -> NSSound? {
+    private static func playBundledSound(named resourceName: String) {
+        guard let url = bundledSoundURL(named: resourceName) else {
+            return
+        }
+        AppSoundPlayback.shared.play(contentsOf: url, volume: Float(soundVolume))
+    }
+
+    private static func bundledSoundURL(named resourceName: String) -> URL? {
+        if let cached = bundledSoundURLCache[resourceName] {
+            return cached
+        }
+
+        let resolvedURL: URL?
         if let url = Bundle.main.url(forResource: resourceName, withExtension: "wav", subdirectory: "Sounds") {
-            return NSSound(contentsOf: url, byReference: false)
+            resolvedURL = url
+        } else {
+            resolvedURL = Bundle.main.url(forResource: resourceName, withExtension: "wav")
         }
 
-        if let url = Bundle.main.url(forResource: resourceName, withExtension: "wav") {
-            return NSSound(contentsOf: url, byReference: false)
+        if let resolvedURL {
+            bundledSoundURLCache[resourceName] = resolvedURL
         }
-
-        return nil
+        return resolvedURL
     }
 }

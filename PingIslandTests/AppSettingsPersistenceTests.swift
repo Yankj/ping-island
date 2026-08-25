@@ -39,6 +39,39 @@ final class AppSettingsPersistenceTests: XCTestCase {
         XCTAssertEqual(store.shortcut(for: .openSessionList), GlobalShortcutAction.openSessionList.defaultShortcut)
     }
 
+    func testFreshSettingsDefaultToSoftSynthAndPersistSelection() {
+        let defaults = makeDefaults()
+        let store = makeStore(defaults: defaults)
+
+        XCTAssertEqual(store.soundThemeMode, .softSynth)
+        XCTAssertEqual(defaults.string(forKey: "soundThemeMode"), SoundThemeMode.softSynth.rawValue)
+    }
+
+    func testExistingSoundThemeSelectionIsPreserved() {
+        let defaults = makeDefaults()
+        defaults.set(SoundThemeMode.island8Bit.rawValue, forKey: "soundThemeMode")
+
+        let store = makeStore(defaults: defaults)
+
+        XCTAssertEqual(store.soundThemeMode, .island8Bit)
+    }
+
+    func testVisualThemeDefaultsToRadiantGlassAndPersistsPixelLanding() {
+        let defaults = makeDefaults()
+        let store = makeStore(defaults: defaults)
+
+        XCTAssertEqual(store.visualThemeMode, .radiantGlass)
+
+        store.visualThemeMode = .pixelLanding
+        let reloadedStore = makeStore(defaults: defaults)
+
+        XCTAssertEqual(reloadedStore.visualThemeMode, .pixelLanding)
+        XCTAssertEqual(
+            defaults.string(forKey: "visualThemeMode"),
+            AgentIslandVisualTheme.pixelLanding.rawValue
+        )
+    }
+
     func testClearedShortcutPersistsAsDisabledInsteadOfRestoringDefault() {
         let defaults = makeDefaults()
         let key = "openActiveSessionShortcut"

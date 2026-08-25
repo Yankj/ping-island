@@ -38,7 +38,7 @@ actor CodexAppServerMonitor {
         let requestedPermissions: [String: Any]?
     }
 
-    private let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Codex")
+    private let logger = Logger(subsystem: "com.agentisland.app", category: "Codex")
     private let port = 41241
     static let maximumWebSocketMessageSize = 32 * 1024 * 1024
 

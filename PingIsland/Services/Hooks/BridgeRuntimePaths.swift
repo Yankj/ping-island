@@ -1,7 +1,7 @@
 import Foundation
 
 enum BridgeRuntimePaths {
-    nonisolated static let appGroupIdentifier = "group.com.wudanwu.PingIsland"
+    nonisolated static let appGroupIdentifier = "group.com.agentisland.app"
     nonisolated static let legacySocketPath = "/tmp/island.sock"
     nonisolated static let bridgeConfigEnvironmentKey = "PING_ISLAND_BRIDGE_CONFIG"
     nonisolated static let socketPathEnvironmentKey = "ISLAND_SOCKET_PATH"

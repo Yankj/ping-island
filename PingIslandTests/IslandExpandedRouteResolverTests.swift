@@ -68,6 +68,21 @@ final class IslandExpandedRouteResolverTests: XCTestCase {
         XCTAssertEqual(route, .attentionNotification(attention))
     }
 
+    func testCompactHoverPreviewKeepsOnlyTwoHighestPrioritySessions() {
+        var oldest = makeSession(id: "oldest", phase: .processing)
+        var middle = makeSession(id: "middle", phase: .processing)
+        var newest = makeSession(id: "newest", phase: .processing)
+        oldest.lastActivity = Date(timeIntervalSince1970: 1)
+        middle.lastActivity = Date(timeIntervalSince1970: 2)
+        newest.lastActivity = Date(timeIntervalSince1970: 3)
+
+        let sessions = IslandExpandedRouteResolver.compactPreviewSessions(
+            from: [oldest, newest, middle]
+        )
+
+        XCTAssertEqual(sessions.map(\.sessionId), ["newest", "middle"])
+    }
+
     func testDockedNotificationWithCompletionResolvesToCompletionNotification() {
         let completed = makeSession(id: "completed", phase: .waitingForInput)
         let notification = SessionCompletionNotification(session: completed, kind: .completed)

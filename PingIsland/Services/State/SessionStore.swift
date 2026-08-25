@@ -46,7 +46,7 @@ actor SessionStore {
     }
 
     /// Logger for session store (nonisolated static for cross-context access)
-    nonisolated static let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Session")
+    nonisolated static let logger = Logger(subsystem: "com.agentisland.app", category: "Session")
 
     // MARK: - State
 

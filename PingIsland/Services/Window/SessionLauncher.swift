@@ -16,7 +16,7 @@ import os.log
 actor SessionLauncher {
     static let shared = SessionLauncher()
 
-    nonisolated private static let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "SessionLauncher")
+    nonisolated private static let logger = Logger(subsystem: "com.agentisland.app", category: "SessionLauncher")
     nonisolated private static let ideWindowRoutingDelayNanoseconds: UInt64 = 250_000_000
     nonisolated private static let ideSessionActivationDelayNanoseconds: UInt64 = 1_000_000_000
     nonisolated private static let ideWindowReadyPollNanoseconds: UInt64 = 50_000_000

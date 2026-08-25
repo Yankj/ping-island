@@ -11,7 +11,7 @@ final class RemoteConnectorManager: ObservableObject {
     @Published private(set) var runtimeStates: [UUID: RemoteEndpointRuntimeState] = [:]
 
     private let defaults = UserDefaults.standard
-    private let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Remote")
+    private let logger = Logger(subsystem: "com.agentisland.app", category: "Remote")
     private let persistenceKey = "RemoteConnectorManager.endpoints.v1"
 
     private var eventHandler: (@Sendable (HookEvent) -> Void)?
@@ -1498,7 +1498,7 @@ final class RemoteConnectorManager: ObservableObject {
           exit 0
         fi
         if [ ! -x \(shellQuote("\(installRoot)/bin/ping-island-bridge")) ] || [ ! -x \(shellQuote("\(installRoot)/bin/PingIslandBridge")) ]; then
-          echo "Ping Island remote bridge is not installed at \(installRoot)/bin" >&2
+          echo "AgentIsland remote bridge is not installed at \(installRoot)/bin" >&2
           exit 127
         fi
         pkill -f \(shellQuote(servicePattern)) >/dev/null 2>&1 || true
@@ -1508,7 +1508,7 @@ final class RemoteConnectorManager: ObservableObject {
         if [ -S \(shellQuote(controlSocketPath)) ] && pgrep -f \(shellQuote(servicePattern)) >/dev/null 2>&1; then
           exit 0
         fi
-        echo "Ping Island remote bridge failed to start" >&2
+        echo "AgentIsland remote bridge failed to start" >&2
         tail -n 40 \(shellQuote("\(installRoot)/logs/remote-agent.log")) >&2 2>/dev/null || true
         exit 1
         """
@@ -1711,7 +1711,7 @@ private enum RemoteEndpointCredentialSource {
 }
 
 private struct RemoteEndpointCredentialStore {
-    private let service = "com.wudanwu.pingisland.remote-host-password"
+    private let service = "com.agentisland.app.remote-host-password"
 
     func hasPassword(for endpointID: UUID) -> Bool {
         password(for: endpointID) != nil
@@ -1795,7 +1795,7 @@ private enum RemoteConnectorError: LocalizedError {
 }
 
 private final class RemoteAttachConnector {
-    nonisolated private static let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Remote")
+    nonisolated private static let logger = Logger(subsystem: "com.agentisland.app", category: "Remote")
 
     private let endpoint: RemoteEndpoint
     private let password: String?
@@ -1991,7 +1991,7 @@ private struct SSHExecutionResult {
 }
 
 private enum RemoteSSHCommandRunner {
-    private static let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "RemoteSSH")
+    private static let logger = Logger(subsystem: "com.agentisland.app", category: "RemoteSSH")
 
     static func probe(target: String, port: Int, password: String?) async throws -> RemoteHostProbe {
         let command = #"printf "%s\n" "$USER" "$HOSTNAME" "$HOME"; uname -s; uname -m; command -v claude >/dev/null 2>&1 && echo "__PING_ISLAND_HAS_CLAUDE__=1" || echo "__PING_ISLAND_HAS_CLAUDE__=0"; command -v tmux >/dev/null 2>&1 && echo "__PING_ISLAND_HAS_TMUX__=1" || echo "__PING_ISLAND_HAS_TMUX__=0""#

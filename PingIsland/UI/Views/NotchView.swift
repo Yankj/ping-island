@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Combine
 import CoreGraphics
 import SwiftUI
 
@@ -32,9 +33,11 @@ struct NotchView: View {
     private static let temporaryReminderMuteDuration: TimeInterval = 10 * 60
     private static let startupDetachmentHintDelay: TimeInterval = 1.8
     private static let detachmentHintRetryDelay: TimeInterval = 0.75
+    private static let idleReminderTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject var sessionMonitor: SessionMonitor
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @StateObject private var activityCoordinator = NotchActivityCoordinator.shared
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var settings = AppSettings.shared
@@ -47,11 +50,15 @@ struct NotchView: View {
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
     @State private var hasPrimedSoundTransitions: Bool = false
+    @State private var previousSessionSoundIds: Set<String> = []
     @State private var previousProcessingIds: Set<String> = []
     @State private var previousAttentionSoundIds: Set<String> = []
     @State private var previousCompletionSoundIds: Set<String> = []
     @State private var previousTaskErrorIds: Set<String> = []
     @State private var previousResourceLimitIds: Set<String> = []
+    @State private var rapidSubmitSoundTracker = RapidSubmitSoundTracker()
+    @State private var idleReminderSoundTracker = IdleReminderSoundTracker()
+    @State private var previousUsageSoundPercentage: Double?
     @State private var previousCompletionNotificationPhases: [String: SessionPhase] = [:]
     @State private var completionNotificationQueue: [SessionCompletionNotification] = []
     @State private var activeCompletionNotification: SessionCompletionNotification?
@@ -329,9 +336,28 @@ struct NotchView: View {
         )
     }
 
-    // Animation springs
-    private let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
-    private let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+    // Animation timing stays responsive while respecting the system motion preference.
+    private var openAnimation: Animation {
+        accessibilityReduceMotion
+            ? .easeOut(duration: 0.12)
+            : .spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0)
+    }
+
+    private var closeAnimation: Animation {
+        accessibilityReduceMotion
+            ? .easeOut(duration: 0.10)
+            : .spring(response: 0.26, dampingFraction: 0.96, blendDuration: 0)
+    }
+
+    private var activityAnimation: Animation? {
+        accessibilityReduceMotion ? nil : .smooth(duration: 0.24)
+    }
+
+    private var hoverFeedbackAnimation: Animation? {
+        accessibilityReduceMotion
+            ? nil
+            : .spring(response: 0.28, dampingFraction: 0.86, blendDuration: 0)
+    }
 
     // MARK: - Body
 
@@ -420,6 +446,15 @@ struct NotchView: View {
                 handleManualAttentionChange(instances)
                 handleCompletedReadyChange(instances)
                 handleCompletionNotificationChange(instances)
+            }
+            .onReceive(Self.idleReminderTimer) { now in
+                handleIdleReminderSound(at: now)
+            }
+            .onReceive(Publishers.CombineLatest(
+                sessionMonitor.$claudeUsageSnapshot,
+                sessionMonitor.$codexUsageSnapshot
+            )) { claude, codex in
+                handleUsageSoundTransition(claude: claude, codex: codex)
             }
     }
 
@@ -514,13 +549,15 @@ struct NotchView: View {
         guard viewModel.presentationMode == .docked else { return }
         guard viewModel.status == .opened else { return }
 
-        withAnimation(viewModel.animation) {
+        withAnimation(accessibilityReduceMotion ? nil : viewModel.animation) {
             viewModel.notchClose()
         }
     }
 
     private var instrumentedBody: some View {
         shortcutAwareBody
+            .font(AgentIslandThemeFont.body(size: 12, theme: settings.visualThemeMode))
+            .environment(\.agentIslandVisualTheme, settings.visualThemeMode)
     }
 
     private var bodyContent: some View {
@@ -571,20 +608,38 @@ struct NotchView: View {
             )
             .animation(isOpened ? openAnimation : closeAnimation, value: viewModel.status)
             .animation(viewModel.closedNotchResizeAnimation, value: notchSize)
-            .animation(.smooth, value: activityCoordinator.expandingActivity)
-            .animation(.smooth, value: hasPendingPermission)
-            .animation(.smooth, value: hasHumanIntervention)
-            .animation(.smooth, value: hasCompletedReadyState)
-            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isBouncing)
+            .animation(activityAnimation, value: activityCoordinator.expandingActivity)
+            .animation(activityAnimation, value: hasPendingPermission)
+            .animation(activityAnimation, value: hasHumanIntervention)
+            .animation(activityAnimation, value: hasCompletedReadyState)
+            .animation(
+                accessibilityReduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.5),
+                value: isBouncing
+            )
             .contentShape(Rectangle())
             .onHover { hovering in
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                withAnimation(hoverFeedbackAnimation) {
                     isHovering = hovering
                 }
             }
             .onTapGesture {
                 if !isOpened {
                     viewModel.notchOpen(reason: .click)
+                }
+            }
+            .contextMenu {
+                Button {
+                    openSettingsWindow()
+                } label: {
+                    Label(AppLocalization.string("打开设置"), systemImage: "gearshape")
+                }
+
+                Divider()
+
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Label(AppLocalization.string("退出 AgentIsland"), systemImage: "power")
                 }
             }
     }
@@ -626,9 +681,13 @@ struct NotchView: View {
                     .zIndex(0)
                     .transition(
                         .asymmetric(
-                            insertion: .scale(scale: 0.8, anchor: .top)
+                            insertion: .scale(scale: accessibilityReduceMotion ? 0.98 : 0.86, anchor: .top)
                                 .combined(with: .opacity)
-                                .animation(.smooth(duration: 0.35)),
+                                .animation(
+                                    accessibilityReduceMotion
+                                        ? .easeOut(duration: 0.12)
+                                        : .smooth(duration: 0.26)
+                                ),
                             removal: .opacity.animation(.easeOut(duration: 0.15))
                         )
                     )
@@ -1033,13 +1092,13 @@ struct NotchView: View {
         detachmentHintDismissWorkItem?.cancel()
 
         if !isShowingDetachmentHint {
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+            withAnimation(accessibilityReduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.86)) {
                 isShowingDetachmentHint = true
             }
         }
 
         let workItem = DispatchWorkItem {
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(accessibilityReduceMotion ? nil : .easeOut(duration: 0.18)) {
                 isShowingDetachmentHint = false
             }
         }
@@ -1051,7 +1110,7 @@ struct NotchView: View {
         detachmentHintDismissWorkItem?.cancel()
         detachmentHintDismissWorkItem = nil
         guard isShowingDetachmentHint else { return }
-        withAnimation(.easeOut(duration: 0.18)) {
+        withAnimation(accessibilityReduceMotion ? nil : .easeOut(duration: 0.18)) {
             isShowingDetachmentHint = false
         }
     }
@@ -1451,6 +1510,7 @@ struct NotchView: View {
 
     private func handleSessionSoundTransitions(_ instances: [SessionState]) {
         if !hasPrimedSoundTransitions {
+            previousSessionSoundIds = Set(instances.map(\.stableId))
             previousProcessingIds = Set(
                 instances
                     .filter(\.phase.contributesToProcessingSoundEdge)
@@ -1488,6 +1548,10 @@ struct NotchView: View {
         let resourceLimitedSessions = instances.filter {
             $0.phase == .compacting
         }
+        let newSessionIds = Set(instances.map(\.stableId))
+        let sessionDeltaIds = newSessionIds.subtracting(previousSessionSoundIds)
+        let newlyStartedSessions = instances.filter { sessionDeltaIds.contains($0.stableId) }
+        let rapidSubmitSessions = rapidSubmitSoundTracker.observe(instances)
 
         let newProcessingIds = Set(processingSessions.map(\.stableId))
         let newAttentionIds = Set(attentionSessions.map(\.stableId))
@@ -1520,15 +1584,49 @@ struct NotchView: View {
             playEventSoundIfNeeded(.attentionRequired, sessions: attentionSessions)
         } else if isNewCompletion {
             playEventSoundIfNeeded(.taskCompleted, sessions: newlyCompletedSessions)
+        } else if !sessionDeltaIds.isEmpty {
+            playEventSoundIfNeeded(.sessionStarted, sessions: newlyStartedSessions)
         } else if !newProcessingIds.subtracting(previousProcessingIds).isEmpty {
             playEventSoundIfNeeded(.processingStarted, sessions: processingSessions)
+        } else if !rapidSubmitSessions.isEmpty {
+            playEventSoundIfNeeded(.rapidSubmit, sessions: rapidSubmitSessions)
         }
 
+        previousSessionSoundIds = newSessionIds
         previousProcessingIds = newProcessingIds
         previousAttentionSoundIds = newAttentionIds
         previousCompletionSoundIds = newCompletedIds
         previousTaskErrorIds = newTaskErrorIds
         previousResourceLimitIds = newResourceLimitIds
+    }
+
+    private func handleIdleReminderSound(at now: Date) {
+        let sessions = idleReminderSoundTracker.sessionsNeedingReminder(
+            from: sessionMonitor.instances,
+            now: now
+        )
+        guard !sessions.isEmpty else { return }
+        playEventSoundIfNeeded(.idleReminder, sessions: sessions)
+    }
+
+    private func handleUsageSoundTransition(
+        claude: ClaudeUsageSnapshot?,
+        codex: CodexUsageSnapshot?
+    ) {
+        let current = UsageSoundTransitionEvaluator.maximumUsedPercentage(
+            claude: claude,
+            codex: codex
+        )
+        defer { previousUsageSoundPercentage = current }
+        guard let event = UsageSoundTransitionEvaluator.event(
+            previous: previousUsageSoundPercentage,
+            current: current
+        ), AppSettings.soundEnabled,
+           AppSettings.isSoundEnabled(for: event),
+           !AppSettings.areReminderNotificationsSuppressed else {
+            return
+        }
+        AppSettings.playSound(for: event, respectsDebounce: true)
     }
 
     private func playEventSoundIfNeeded(_ event: NotificationEvent, sessions: [SessionState]) {
@@ -1538,7 +1636,7 @@ struct NotchView: View {
             let shouldPlaySound = await shouldPlayNotificationSound(for: sessions)
             if shouldPlaySound {
                 _ = await MainActor.run {
-                    AppSettings.playSound(for: event)
+                    AppSettings.playSound(for: event, respectsDebounce: true)
                 }
             }
         }
@@ -1593,6 +1691,7 @@ struct NotchView: View {
 }
 
 private struct NotchDetachmentHintView: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var isArrowNudging = false
 
     var body: some View {
@@ -1609,6 +1708,7 @@ private struct NotchDetachmentHintView: View {
                 )
                 .onAppear {
                     isArrowNudging = false
+                    guard !accessibilityReduceMotion else { return }
                     withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                         isArrowNudging = true
                     }

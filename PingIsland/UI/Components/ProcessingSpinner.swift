@@ -54,8 +54,10 @@ struct ProcessingSpinner: View {
     }
 }
 
+#if !LOCAL_UNSIGNED_BUILD
 #Preview {
     ProcessingSpinner()
         .frame(width: 30, height: 30)
         .background(.black)
 }
+#endif

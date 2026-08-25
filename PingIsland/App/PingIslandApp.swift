@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct PingIslandApp: App {
+struct AgentIslandApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var settings = AppSettings.shared
 

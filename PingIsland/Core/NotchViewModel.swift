@@ -63,8 +63,12 @@ class NotchViewModel: ObservableObject {
     private static let defaultClosedHeight = ScreenNotchMetrics.fallbackClosedHeight
     private static let clickedInstancesPanelWidthRatio: CGFloat = 0.44
     private static let clickedInstancesPanelMaximumWidth: CGFloat = 520
+    private static let hoveredInstancesPanelMaximumWidth: CGFloat = 440
     private static let detachmentLongPressNarrowedWidthScale: CGFloat = 0.82
     private static let detachmentLongPressMaximumShrink: CGFloat = 56
+    nonisolated static let defaultHoverActivationDelay: TimeInterval = 0.15
+    nonisolated static let fullscreenHoverActivationDelay: TimeInterval = 0.12
+    nonisolated static let hoverExitGraceDuration: TimeInterval = 0.12
     @Published private(set) var closedWidth: CGFloat
 
     var deviceNotchRect: CGRect { geometry.deviceNotchRect }
@@ -178,7 +182,7 @@ class NotchViewModel: ObservableObject {
             case .docked:
                 return CGSize(
                     width: openReason == .hover
-                        ? min(screenRect.width - 64, 600)
+                        ? min(screenRect.width - 64, Self.hoveredInstancesPanelMaximumWidth)
                         : min(
                             screenRect.width * Self.clickedInstancesPanelWidthRatio,
                             Self.clickedInstancesPanelMaximumWidth
@@ -235,14 +239,14 @@ class NotchViewModel: ObservableObject {
     // MARK: - Animation
 
     var animation: Animation {
-        .easeOut(duration: 0.25)
+        .spring(response: 0.32, dampingFraction: 0.86, blendDuration: 0)
     }
 
     var closedNotchResizeAnimation: Animation {
         if isDetachmentNarrowingClosedNotch {
             return .linear(duration: detachmentLongPressNarrowAnimationDuration)
         }
-        return .spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
+        return .spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0)
     }
 
     var isDetachmentNarrowingClosedNotch: Bool {
@@ -263,10 +267,7 @@ class NotchViewModel: ObservableObject {
     private let autoHideWhenIdleProvider: @MainActor () -> Bool
     private let notchModuleWidthProvider: @MainActor () -> Double
     private var hoverTimer: DispatchWorkItem?
-    // Keep hover previews feeling responsive without making incidental cursor
-    // passes over the notch expand it too aggressively.
-    private let defaultHoverActivationDelay: TimeInterval = 0.24
-    private let fullscreenHoverActivationDelay: TimeInterval = 0.18
+    private var hoverExitWorkItem: DispatchWorkItem?
     private let fullscreenRevealZoneHeight: CGFloat = 8
     private let fullscreenRevealZoneHorizontalInset: CGFloat = 36
     private let fullscreenStateSettleDelay: TimeInterval
@@ -530,7 +531,14 @@ class NotchViewModel: ObservableObject {
 
         let newHovering = inNotch || inOpened
 
-        // Only update if changed to prevent unnecessary re-renders
+        // A move back into the Island during the short exit grace period should
+        // keep the preview stable instead of collapsing and immediately reopening.
+        if newHovering {
+            hoverExitWorkItem?.cancel()
+            hoverExitWorkItem = nil
+        }
+
+        // Only update if changed to prevent unnecessary re-renders.
         guard newHovering != isHovering else { return }
 
         isHovering = newHovering
@@ -547,7 +555,7 @@ class NotchViewModel: ObservableObject {
             isInlineTextInputActive: isInlineTextInputActive,
             autoCollapseOnLeave: AppSettings.autoCollapseOnLeave
         ) {
-            notchClose()
+            scheduleHoverCollapse()
         }
 
         // Start hover timer to auto-expand after a short dwell
@@ -558,6 +566,30 @@ class NotchViewModel: ObservableObject {
             hoverTimer = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + hoverActivationDelay, execute: workItem)
         }
+    }
+
+    private func scheduleHoverCollapse() {
+        hoverExitWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.hoverExitWorkItem = nil
+            guard Self.shouldAutoCollapseHoverPreview(
+                isHovering: self.isHovering,
+                status: self.status,
+                openReason: self.openReason,
+                isSettingsPopoverPresented: self.isSettingsPopoverPresented,
+                isInlineTextInputActive: self.isInlineTextInputActive,
+                autoCollapseOnLeave: AppSettings.autoCollapseOnLeave
+            ) else { return }
+            self.notchClose()
+        }
+
+        hoverExitWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + Self.hoverExitGraceDuration,
+            execute: workItem
+        )
     }
 
     private func handleMouseDown(_ event: NSEvent) {
@@ -700,7 +732,9 @@ class NotchViewModel: ObservableObject {
     }
 
     private var hoverActivationDelay: TimeInterval {
-        isFullscreenEdgeRevealActive ? fullscreenHoverActivationDelay : defaultHoverActivationDelay
+        isFullscreenEdgeRevealActive
+            ? Self.fullscreenHoverActivationDelay
+            : Self.defaultHoverActivationDelay
     }
 
     var shouldHideWindowPresentation: Bool {
@@ -775,6 +809,8 @@ class NotchViewModel: ObservableObject {
     func notchOpen(reason: NotchOpenReason = .unknown) {
         hoverTimer?.cancel()
         hoverTimer = nil
+        hoverExitWorkItem?.cancel()
+        hoverExitWorkItem = nil
 
         if reason == .notification && shouldSuppressAutomaticPresentation {
             return
@@ -814,6 +850,10 @@ class NotchViewModel: ObservableObject {
     }
 
     func notchClose() {
+        hoverTimer?.cancel()
+        hoverTimer = nil
+        hoverExitWorkItem?.cancel()
+        hoverExitWorkItem = nil
         status = .closed
         currentChatSession = nil
         contentType = .instances

@@ -2425,6 +2425,7 @@ private struct DragTrailConfig {
     let maxOpacity: Double
 }
 
+#if !LOCAL_UNSIGNED_BUILD
 #Preview("Mascot Grid") {
     VStack(spacing: 20) {
         ForEach(MascotStatus.allCases, id: \.self) { status in
@@ -2443,3 +2444,4 @@ private struct DragTrailConfig {
     .padding()
     .background(Color.black)
 }
+#endif

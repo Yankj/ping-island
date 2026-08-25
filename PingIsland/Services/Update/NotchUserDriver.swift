@@ -1,7 +1,7 @@
 import AppKit
 import Combine
 import Foundation
-#if !APP_STORE
+#if !APP_STORE && !LOCAL_UNSIGNED_BUILD
 import Sparkle
 #endif
 
@@ -43,7 +43,7 @@ enum UpdateConfigurationStatus: Equatable {
     }
 }
 
-#if APP_STORE
+#if APP_STORE || LOCAL_UNSIGNED_BUILD
 @MainActor
 final class UpdateManager: ObservableObject {
     static let shared = UpdateManager()
@@ -52,7 +52,13 @@ final class UpdateManager: ObservableObject {
     @Published var state: UpdateState = .idle
     @Published var hasUnseenUpdate = false
     @Published private(set) var latestReleaseNotes: UpdateReleaseNotes?
-    @Published private(set) var configurationStatus = UpdateConfigurationStatus.appStoreManaged
+    @Published private(set) var configurationStatus: UpdateConfigurationStatus = {
+#if APP_STORE
+        .appStoreManaged
+#else
+        .unconfigured
+#endif
+    }()
     @Published private(set) var availableVersion: String?
 
     private init() {}
@@ -70,11 +76,19 @@ final class UpdateManager: ObservableObject {
     }
 
     var releaseNotesActionTitle: String {
+#if APP_STORE
         "版本历史由 App Store 管理"
+#else
+        "本地试用包不包含自动更新"
+#endif
     }
 
     var releaseNotesActionSubtitle: String {
+#if APP_STORE
         "Mac App Store 版本不包含独立更新器"
+#else
+        "请安装新的试用包来更新"
+#endif
     }
 
     func start() {}

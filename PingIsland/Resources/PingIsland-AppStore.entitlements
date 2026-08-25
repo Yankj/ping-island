@@ -14,7 +14,7 @@
     <true/>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>group.com.wudanwu.PingIsland</string>
+        <string>group.com.agentisland.app</string>
     </array>
 </dict>
 </plist>

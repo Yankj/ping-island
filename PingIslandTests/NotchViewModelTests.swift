@@ -89,6 +89,23 @@ final class NotchViewModelTests: XCTestCase {
         }
     }
 
+    func testHoverTimingKeepsEntryResponsiveAndExitStable() {
+        XCTAssertEqual(NotchViewModel.defaultHoverActivationDelay, 0.15)
+        XCTAssertEqual(NotchViewModel.fullscreenHoverActivationDelay, 0.12)
+        XCTAssertEqual(NotchViewModel.hoverExitGraceDuration, 0.12)
+    }
+
+    func testHoverPreviewUsesCompactWidth() async {
+        await MainActor.run {
+            let viewModel = makeViewModel()
+
+            viewModel.notchOpen(reason: .hover)
+
+            XCTAssertEqual(viewModel.openedSize.width, 440)
+            XCTAssertLessThan(viewModel.openedSize.width, 520)
+        }
+    }
+
     func testClosingNotchClearsInlineTextInputState() async {
         await MainActor.run {
             let viewModel = makeViewModel()

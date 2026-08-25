@@ -12,6 +12,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var shouldRunHookWalkthroughAfterOnboarding = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AgentIslandBrand.installApplicationIcon()
+
         if launchConfiguration.shouldEnforceSingleInstance && !ensureSingleInstance() {
             NSApplication.shared.terminate(nil)
             return
@@ -20,6 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Touch the settings store early so the bridge runtime config is on disk
         // before any hook fires.
         _ = AppSettings.shared
+        AppSettings.prepareSoundPlayback()
 #if APP_STORE
         HookInstaller.restoreAppStoreHookDirectoryAuthorizationIfAvailable()
 #endif
@@ -49,6 +52,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     AppSettings.floatingPetSettingsHintPending = true
                 }
             )
+
+            // AgentIsland preview builds carry a versioned welcome experience.
+            // Upgrading over an older preview must still show the new launch
+            // ceremony once; the original first-install marker is not enough.
+            AgentIslandOnboardingExperience.prepareForLaunch()
         }
 
         NSApplication.shared.setActivationPolicy(launchConfiguration.activationPolicy)
@@ -151,23 +159,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func completePresentationModeOnboarding(with selectedMode: IslandSurfaceMode) {
         AppSettings.surfaceMode = selectedMode
+        AgentIslandOnboardingExperience.markCompleted()
         AppSettings.presentationModeOnboardingPending = false
         AppSettings.notchDetachmentHintPending = false
         AppSettings.floatingPetSettingsHintPending = false
         startWindowManagerIfNeeded()
 
         if shouldRunHookWalkthroughAfterOnboarding {
-#if APP_STORE
             shouldRunHookWalkthroughAfterOnboarding = false
             _ = presentHookInstallOnboardingIfNeeded()
-#else
-            if AppSettings.hookInstallOnboardingPending {
-                HookInstaller.performFirstRunDefaultInstall()
-            }
-            AppSettings.hookInstallOnboardingPending = false
-            shouldPresentSettingsAfterOnboarding = false
-            startHookWalkthroughAfterOnboardingIfNeeded()
-#endif
             return
         }
 
@@ -205,9 +205,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     private func ensureSingleInstance() -> Bool {
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.wudanwu.PingIsland"
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.agentisland.app"
         let runningApps = NSWorkspace.shared.runningApplications.filter {
-            $0.bundleIdentifier == bundleID
+            $0.bundleIdentifier == bundleID || $0.bundleIdentifier == "com.wudanwu.PingIsland"
+        }
+
+        if bundleID != "com.wudanwu.PingIsland",
+           runningApps.contains(where: { $0.bundleIdentifier == "com.wudanwu.PingIsland" }) {
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = AppLocalization.string("请先退出 Ping Island")
+            alert.informativeText = AppLocalization.string(
+                "AgentIsland 与 Ping Island 共用 Hooks 和本地 Bridge，一次只能运行一个。退出原版后再启动 AgentIsland。"
+            )
+            alert.addButton(withTitle: AppLocalization.string("知道了"))
+            alert.runModal()
+            return false
         }
 
         if runningApps.count > 1 {

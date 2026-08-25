@@ -10,7 +10,7 @@ import Combine
 import os.log
 
 /// Logger for window management
-private let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Window")
+private let logger = Logger(subsystem: "com.agentisland.app", category: "Window")
 
 @MainActor
 class WindowManager {
