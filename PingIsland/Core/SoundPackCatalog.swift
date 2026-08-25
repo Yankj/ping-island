@@ -240,7 +240,7 @@ private enum SoundPackScanner {
             currentDirectory.appendingPathComponent(".claude/hooks/peon-ping/packs", isDirectory: true)
         ]
 
-        return candidateDirectories.flatMap { directory in
+        return candidateDirectories.flatMap { directory -> [URL] in
             guard fileManager.fileExists(atPath: directory.path) else { return [] }
             return packDirectories(in: directory)
         }
