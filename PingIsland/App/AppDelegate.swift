@@ -31,6 +31,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UpdateManager.shared.start()
             UserIdleAutoProtection.shared.start()
             Task {
+                await SoundPackCatalog.shared.refreshInBackground()
+            }
+            Task {
                 await TelemetryService.shared.start()
             }
         }

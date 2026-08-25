@@ -120,13 +120,12 @@ struct QoderCLIHookRefreshNoticeGate {
     }
 }
 
-struct ClosedNotchUsageAvailability: Equatable {
+struct ClosedNotchUsageAvailability: Equatable, Sendable {
     var hasClaudeSevenDay = false
     var hasCodexSevenDay = false
 
-    @MainActor
-    static func current() -> ClosedNotchUsageAvailability {
-        guard AppSettings.showUsage else {
+    nonisolated static func load(showUsage: Bool) -> ClosedNotchUsageAvailability {
+        guard showUsage else {
             return ClosedNotchUsageAvailability()
         }
 
@@ -210,6 +209,11 @@ final class SettingsPanelViewModel: ObservableObject {
     )
 
     private var hookFeedbackClearTasks: [String: Task<Void, Never>] = [:]
+    private var lastCategoryRefreshDates: [SettingsCategory: Date] = [:]
+    private let categoryRefreshInterval: TimeInterval
+    private let categoryRefreshClock: @MainActor () -> Date
+    private let closedNotchUsageAvailabilityLoader: @MainActor (Bool) async -> ClosedNotchUsageAvailability
+    private let soundPackRefreshProvider: @MainActor () async -> Void
     private let qoderCLIHookRefreshStatusProvider: @MainActor () -> HookInstaller.QoderCLIHookRefreshStatus?
     private let qoderCLIHookRefreshNoticeGate: QoderCLIHookRefreshNoticeGate
     private let accessibilityStatusProvider: @MainActor (_ prompt: Bool) -> Bool
@@ -228,6 +232,16 @@ final class SettingsPanelViewModel: ObservableObject {
                 return
             }
             NSWorkspace.shared.open(url)
+        },
+        categoryRefreshInterval: TimeInterval = 5,
+        categoryRefreshClock: @escaping @MainActor () -> Date = Date.init,
+        closedNotchUsageAvailabilityLoader: @escaping @MainActor (Bool) async -> ClosedNotchUsageAvailability = { showUsage in
+            await Task.detached(priority: .userInitiated) {
+                ClosedNotchUsageAvailability.load(showUsage: showUsage)
+            }.value
+        },
+        soundPackRefreshProvider: @escaping @MainActor () async -> Void = {
+            await SoundPackCatalog.shared.refreshInBackground()
         }
     ) {
         self.qoderCLIHookRefreshStatusProvider = qoderCLIHookRefreshStatusProvider
@@ -236,6 +250,10 @@ final class SettingsPanelViewModel: ObservableObject {
         )
         self.accessibilityStatusProvider = accessibilityStatusProvider
         self.accessibilitySettingsOpener = accessibilitySettingsOpener
+        self.categoryRefreshInterval = categoryRefreshInterval
+        self.categoryRefreshClock = categoryRefreshClock
+        self.closedNotchUsageAvailabilityLoader = closedNotchUsageAvailabilityLoader
+        self.soundPackRefreshProvider = soundPackRefreshProvider
     }
 
     var visibleHookProfiles: [ManagedHookClientProfile] {
@@ -269,17 +287,20 @@ final class SettingsPanelViewModel: ObservableObject {
         refreshLocalizedState()
     }
 
-    func refresh(for category: SettingsCategory) {
-        launchAtLogin = SMAppService.mainApp.status == .enabled
-        refreshAccessibilityStatus()
-        refreshLocalizedState()
+    func refresh(for category: SettingsCategory, force: Bool = false) async {
+        let refreshDate = categoryRefreshClock()
+        if !force,
+           let lastRefresh = lastCategoryRefreshDates[category],
+           refreshDate.timeIntervalSince(lastRefresh) < categoryRefreshInterval {
+            return
+        }
 
         switch category {
         case .display:
             ScreenSelector.shared.refreshScreens()
-            refreshClosedNotchUsageAvailability()
+            await refreshClosedNotchUsageAvailability()
         case .sound:
-            SoundPackCatalog.shared.refresh()
+            await soundPackRefreshProvider()
         case .integration:
             refreshHookInstallationStates()
             refreshIDEExtensionInstallationStates()
@@ -289,6 +310,9 @@ final class SettingsPanelViewModel: ObservableObject {
         case .general, .shortcuts, .mascot, .analytics, .remote, .labs, .about:
             break
         }
+
+        guard !Task.isCancelled else { return }
+        lastCategoryRefreshDates[category] = refreshDate
     }
 
     func refreshAccessibilityStatus() {
@@ -326,8 +350,11 @@ final class SettingsPanelViewModel: ObservableObject {
         qoderCLIHookRefreshNoticeStatus = status
     }
 
-    func refreshClosedNotchUsageAvailability() {
-        closedNotchUsageAvailability = ClosedNotchUsageAvailability.current()
+    func refreshClosedNotchUsageAvailability() async {
+        let showUsage = AppSettings.showUsage
+        let availability = await closedNotchUsageAvailabilityLoader(showUsage)
+        guard !Task.isCancelled else { return }
+        closedNotchUsageAvailability = availability
     }
 
     func refreshBridgeHealthStatus() {
@@ -920,8 +947,9 @@ private final class AgentUsageAnalyticsViewModel: ObservableObject {
 
     private var refreshTask: Task<Void, Never>?
 
-    var isInitialLoading: Bool {
-        isRefreshing && !hasLoadedSnapshot
+    func refreshIfNeeded() {
+        guard !hasLoadedSnapshot, !isRefreshing else { return }
+        refresh()
     }
 
     func refresh() {
@@ -951,7 +979,7 @@ private final class AgentUsageAnalyticsViewModel: ObservableObject {
 }
 
 private struct AgentUsageAnalyticsContent: View {
-    @StateObject private var viewModel = AgentUsageAnalyticsViewModel()
+    @ObservedObject var viewModel: AgentUsageAnalyticsViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -992,16 +1020,6 @@ private struct AgentUsageAnalyticsContent: View {
                 )
                 .frame(maxWidth: .infinity)
             }
-        }
-        .overlay {
-            if viewModel.isInitialLoading {
-                AgentUsageLoadingOverlay()
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.18), value: viewModel.isInitialLoading)
-        .onAppear {
-            viewModel.refresh()
         }
     }
 
@@ -1089,42 +1107,6 @@ private struct AgentUsageAnalyticsContent: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
         }
-    }
-}
-
-private struct AgentUsageLoadingOverlay: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.black.opacity(0.22))
-                .background(
-                    SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .opacity(0.90)
-                )
-
-            VStack(spacing: 10) {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(.white.opacity(0.84))
-
-                Text(appLocalized: "正在加载统计")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.72))
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.08))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                    )
-            )
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .allowsHitTesting(true)
     }
 }
 
@@ -2430,50 +2412,6 @@ private enum AgentUsageFormat {
     }
 }
 
-private struct SettingsCategoryLoadingView: View {
-    let category: SettingsCategory
-
-    var body: some View {
-        SettingsSectionCard(title: category.title) {
-            VStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(.white.opacity(0.82))
-
-                Text(verbatim: loadingTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.88))
-
-                Text(verbatim: loadingSubtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.54))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, minHeight: 180)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 24)
-        }
-    }
-
-    private var loadingTitle: String {
-        AppLocalization.format("正在加载%@设置…", AppLocalization.string(category.title))
-    }
-
-    private var loadingSubtitle: String {
-        switch category {
-        case .display:
-            return AppLocalization.string("正在刷新显示器与用量展示状态")
-        case .sound:
-            return AppLocalization.string("正在扫描可用声音主题包")
-        case .integration:
-            return AppLocalization.string("正在检查 Hooks、IDE 扩展与客户端安装状态")
-        case .general, .shortcuts, .mascot, .analytics, .remote, .labs, .about:
-            return AppLocalization.string("马上就好")
-        }
-    }
-}
-
 private struct SettingsSidebarSection: Identifiable {
     let title: String?
     let categories: [SettingsCategory]
@@ -2518,6 +2456,7 @@ private struct SettingsPanelContentView: View {
     var onClose: (() -> Void)? = nil
 
     @StateObject private var viewModel = SettingsPanelViewModel()
+    @StateObject private var analyticsViewModel = AgentUsageAnalyticsViewModel()
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var updateManager = UpdateManager.shared
@@ -2533,7 +2472,6 @@ private struct SettingsPanelContentView: View {
     @State private var consecutiveGeneralTapCount = 0
     @State private var isAccessibilityPollingActive = false
     @State private var arePreviewAnimationsActive = false
-    @State private var loadingCategory: SettingsCategory?
     @State private var categoryRefreshTask: Task<Void, Never>?
 
     var body: some View {
@@ -2574,7 +2512,7 @@ private struct SettingsPanelContentView: View {
             isAccessibilityPollingActive = isVisible
             arePreviewAnimationsActive = isVisible
 
-            scheduleCategoryRefresh(for: currentCategory, showLoading: false)
+            scheduleCategoryRefresh(for: currentCategory)
             showAnalyticsConsentPromptIfNeeded()
         }
         .onDisappear {
@@ -2582,7 +2520,6 @@ private struct SettingsPanelContentView: View {
             arePreviewAnimationsActive = false
             categoryRefreshTask?.cancel()
             categoryRefreshTask = nil
-            loadingCategory = nil
         }
         .task(id: isAccessibilityPollingActive) {
             guard isAccessibilityPollingActive else { return }
@@ -2601,7 +2538,7 @@ private struct SettingsPanelContentView: View {
             isAccessibilityPollingActive = isVisible
             arePreviewAnimationsActive = isVisible
             if isVisible {
-                scheduleCategoryRefresh(for: currentCategory, showLoading: false)
+                scheduleCategoryRefresh(for: currentCategory)
                 showAnalyticsConsentPromptIfNeeded()
             }
         }
@@ -2615,7 +2552,7 @@ private struct SettingsPanelContentView: View {
             selectSidebarCategory(category)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            scheduleCategoryRefresh(for: currentCategory, showLoading: false)
+            scheduleCategoryRefresh(for: currentCategory, force: true)
         }
         .onChange(of: settings.appLanguage) { _, _ in
             viewModel.refreshLocalizedState()
@@ -2979,31 +2916,27 @@ private struct SettingsPanelContentView: View {
     private var detail: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
-                if loadingCategory == currentCategory {
-                    SettingsCategoryLoadingView(category: currentCategory)
-                } else {
-                    switch currentCategory {
-                    case .general:
-                        generalContent
-                    case .shortcuts:
-                        shortcutsContent
-                    case .display:
-                        displayContent
-                    case .mascot:
-                        mascotContent
-                    case .sound:
-                        soundContent
-                    case .analytics:
-                        analyticsContent
-                    case .integration:
-                        integrationContent
-                    case .remote:
-                        remoteContent
-                    case .labs:
-                        labsContent
-                    case .about:
-                        aboutContent
-                    }
+                switch currentCategory {
+                case .general:
+                    generalContent
+                case .shortcuts:
+                    shortcutsContent
+                case .display:
+                    displayContent
+                case .mascot:
+                    mascotContent
+                case .sound:
+                    soundContent
+                case .analytics:
+                    analyticsContent
+                case .integration:
+                    integrationContent
+                case .remote:
+                    remoteContent
+                case .labs:
+                    labsContent
+                case .about:
+                    aboutContent
                 }
             }
             .padding(.horizontal, 22)
@@ -3011,7 +2944,6 @@ private struct SettingsPanelContentView: View {
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .id(currentCategory)
         .accessibilityIdentifier("settings.detail.\(currentCategory.rawValue)")
         .background(
             detailShape
@@ -3068,11 +3000,7 @@ private struct SettingsPanelContentView: View {
             selectedCategory = .labs
         }
 
-        let categoryToRefresh = currentCategory
-        scheduleCategoryRefresh(
-            for: categoryToRefresh,
-            showLoading: shouldShowLoading(for: categoryToRefresh)
-        )
+        scheduleCategoryRefresh(for: currentCategory)
     }
 
     private func showAnalyticsConsentPromptIfNeeded() {
@@ -3084,39 +3012,20 @@ private struct SettingsPanelContentView: View {
         showingAnalyticsConsentPrompt = true
     }
 
-    private func shouldShowLoading(for category: SettingsCategory) -> Bool {
-        switch category {
-        case .display, .sound, .integration:
-            return true
-        case .general, .shortcuts, .mascot, .analytics, .remote, .labs, .about:
-            return false
-        }
-    }
-
-    private func scheduleCategoryRefresh(for category: SettingsCategory, showLoading: Bool) {
+    private func scheduleCategoryRefresh(for category: SettingsCategory, force: Bool = false) {
         categoryRefreshTask?.cancel()
         categoryRefreshTask = nil
 
-        if showLoading {
-            loadingCategory = category
-        } else if loadingCategory == category {
-            loadingCategory = nil
+        if category == .analytics {
+            if force {
+                analyticsViewModel.refresh()
+            } else {
+                analyticsViewModel.refreshIfNeeded()
+            }
         }
 
-        categoryRefreshTask = Task { @MainActor in
-            if showLoading {
-                try? await Task.sleep(nanoseconds: 80_000_000)
-            } else {
-                await Task.yield()
-            }
-
-            guard !Task.isCancelled else { return }
-            viewModel.refresh(for: category)
-
-            guard !Task.isCancelled else { return }
-            if loadingCategory == category {
-                loadingCategory = nil
-            }
+        categoryRefreshTask = Task {
+            await viewModel.refresh(for: category, force: force)
         }
     }
 
@@ -3446,7 +3355,7 @@ private struct SettingsPanelContentView: View {
     }
 
     private var analyticsContent: some View {
-        AgentUsageAnalyticsContent()
+        AgentUsageAnalyticsContent(viewModel: analyticsViewModel)
     }
 
     private var integrationContent: some View {
