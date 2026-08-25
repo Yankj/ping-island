@@ -2405,6 +2405,7 @@ private enum SettingsPanelMetrics {
     static let windowSidebarWidth: CGFloat = 236
     static let popoverSidebarWidth: CGFloat = 212
     static let windowSidebarTopInset: CGFloat = 56
+    static let windowDetailTopInset: CGFloat = 56
     static let windowContentTopInset: CGFloat = 0
     static let popoverContentTopInset: CGFloat = 0
     static let outerPadding: CGFloat = 0
@@ -2845,7 +2846,10 @@ private struct SettingsPanelContentView: View {
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.top, presentation == .window ? 42 : 24)
+            .padding(
+                .top,
+                presentation == .window ? SettingsPanelMetrics.windowDetailTopInset : 24
+            )
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
