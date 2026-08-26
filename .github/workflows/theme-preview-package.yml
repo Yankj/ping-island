@@ -1,17 +1,17 @@
-name: Theme Preview Package
+name: Theme V2 Preview Package
 
 on:
   push:
     branches:
-      - build/theme-preview-package
+      - build/theme-v2-preview-package
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  package:
-    name: Build unsigned macOS preview package
+  validate-and-package:
+    name: Test and build Universal unsigned preview
     runs-on: macos-15
     timeout-minutes: 30
 
@@ -22,6 +22,22 @@ jobs:
       - name: Report Xcode version
         run: xcodebuild -version
 
+      - name: Run prototype tests
+        run: swift test --package-path Prototype
+
+      - name: Run Xcode unit tests
+        run: >
+          xcodebuild
+          -project PingIsland.xcodeproj
+          -scheme PingIsland
+          -configuration Debug
+          -destination 'platform=macOS'
+          -derivedDataPath "$RUNNER_TEMP/TestDerivedData"
+          -resultBundlePath "$RUNNER_TEMP/PingIslandTests.xcresult"
+          CODE_SIGNING_ALLOWED=NO
+          test
+          -only-testing:PingIslandTests
+
       - name: Build unsigned DMG and ZIP
         env:
           PING_ISLAND_ARCHS: arm64 x86_64
@@ -30,9 +46,18 @@ jobs:
       - name: Upload preview package
         uses: actions/upload-artifact@v4
         with:
-          name: PingIsland-theme-preview-${{ github.sha }}
+          name: PingIsland-theme-v2-preview-${{ github.sha }}
           path: |
             releases/unsigned/*.dmg
             releases/unsigned/*.zip
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Xcode test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PingIsland-theme-v2-tests-${{ github.sha }}
+          path: ${{ runner.temp }}/PingIslandTests.xcresult
+          if-no-files-found: ignore
           retention-days: 7
