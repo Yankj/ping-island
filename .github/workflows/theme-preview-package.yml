@@ -1,0 +1,36 @@
+name: Theme Preview Package
+
+on:
+  push:
+    branches:
+      - build/theme-preview-package
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build unsigned macOS preview package
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout preview source
+        uses: actions/checkout@v4
+
+      - name: Report Xcode version
+        run: xcodebuild -version
+
+      - name: Build unsigned DMG and ZIP
+        run: ./scripts/package-unsigned.sh
+
+      - name: Upload preview package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PingIsland-theme-preview-${{ github.sha }}
+          path: |
+            releases/unsigned/*.dmg
+            releases/unsigned/*.zip
+          if-no-files-found: error
+          retention-days: 7
