@@ -51,11 +51,26 @@ final class ExperienceThemeTests: XCTestCase {
             String(describing: arcade.visual.accent),
             String(describing: gameBoy.visual.accent)
         )
-        XCTAssertEqual(arcade.sound.cue(for: .taskCompleted), gameBoy.sound.cue(for: .taskCompleted))
-        XCTAssertEqual(arcade.sound.cue(for: .taskError), gameBoy.sound.cue(for: .taskError))
-        XCTAssertEqual(arcade.sound.cue(for: .taskCompleted)?.island8BitSound, .completeDing)
-        XCTAssertEqual(arcade.sound.cue(for: .taskError)?.island8BitSound, .errorBuzz)
-        XCTAssertEqual(arcade.sound.cue(for: .resourceLimit)?.island8BitSound, .hurt)
+        XCTAssertEqual(
+            arcade.sound.cue(for: NotificationEvent.taskCompleted),
+            gameBoy.sound.cue(for: NotificationEvent.taskCompleted)
+        )
+        XCTAssertEqual(
+            arcade.sound.cue(for: NotificationEvent.taskError),
+            gameBoy.sound.cue(for: NotificationEvent.taskError)
+        )
+        XCTAssertEqual(
+            arcade.sound.cue(for: NotificationEvent.taskCompleted)?.island8BitSound,
+            .completeDing
+        )
+        XCTAssertEqual(
+            arcade.sound.cue(for: NotificationEvent.taskError)?.island8BitSound,
+            .errorBuzz
+        )
+        XCTAssertEqual(
+            arcade.sound.cue(for: NotificationEvent.resourceLimit)?.island8BitSound,
+            .hurt
+        )
     }
 
     func testConfirmationActionRolesKeepTheirSemanticsDistinct() {
