@@ -23,6 +23,8 @@ jobs:
         run: xcodebuild -version
 
       - name: Build unsigned DMG and ZIP
+        env:
+          PING_ISLAND_ARCHS: arm64 x86_64
         run: ./scripts/package-unsigned.sh
 
       - name: Upload preview package
