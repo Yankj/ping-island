@@ -19,6 +19,12 @@ SCHEME="PingIsland"
 PROJECT_FILE="$PROJECT_DIR/PingIsland.xcodeproj"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/$APP_BUNDLE_NAME"
 BUILD_MODE_LABEL="release"
+BUILD_ARCHS="${PING_ISLAND_ARCHS:-}"
+BUILD_ARCH_ARGS=()
+
+if [ -n "$BUILD_ARCHS" ]; then
+    BUILD_ARCH_ARGS+=("ARCHS=$BUILD_ARCHS" "ONLY_ACTIVE_ARCH=NO")
+fi
 
 echo "=== Packaging Unsigned Ping Island ==="
 echo ""
@@ -65,6 +71,7 @@ if ! xcodebuild \
     -scheme "$SCHEME" \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
+    "${BUILD_ARCH_ARGS[@]}" \
     CODE_SIGN_IDENTITY=- \
     build; then
     echo ""
@@ -76,6 +83,7 @@ if ! xcodebuild \
         -scheme "$SCHEME" \
         -configuration Release \
         -derivedDataPath "$DERIVED_DATA_PATH" \
+        "${BUILD_ARCH_ARGS[@]}" \
         CODE_SIGN_IDENTITY=- \
         SWIFT_OPTIMIZATION_LEVEL=-Onone \
         SWIFT_COMPILATION_MODE=singlefile \
