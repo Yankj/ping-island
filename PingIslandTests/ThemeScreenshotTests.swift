@@ -1,0 +1,69 @@
+import AppKit
+import XCTest
+@testable import Ping_Island
+
+@MainActor
+final class ThemeScreenshotTests: XCTestCase {
+    func testWriteSettingsThemeScreenshotsWhenRequested() throws {
+        guard let outputDirectory = ProcessInfo.processInfo.environment["PING_ISLAND_THEME_SCREENSHOT_DIR"],
+              !outputDirectory.isEmpty else {
+            return
+        }
+
+        ExperienceThemeFontRegistry.registerBundledFonts()
+        try FileManager.default.createDirectory(
+            atPath: outputDirectory,
+            withIntermediateDirectories: true
+        )
+
+        let settings = AppSettings.shared
+        let originalTheme = settings.experienceThemeID
+        let originalPixelPalette = settings.pixelThemePaletteID
+        let originalConsent = settings.analyticsConsentPromptCompleted
+        defer {
+            settings.experienceThemeID = originalTheme
+            settings.pixelThemePaletteID = originalPixelPalette
+            settings.analyticsConsentPromptCompleted = originalConsent
+            SettingsWindowController.shared.dismiss()
+        }
+
+        settings.analyticsConsentPromptCompleted = true
+        let variants: [(String, ExperienceThemeID, PixelThemePaletteID)] = [
+            ("settings-ping-island", .standard, .arcadeNeon),
+            ("settings-macos", .macOS, .arcadeNeon),
+            ("settings-pixel-arcade", .pixel, .arcadeNeon),
+            ("settings-pixel-game-boy", .pixel, .gameBoyOlive)
+        ]
+
+        for (filename, themeID, paletteID) in variants {
+            settings.experienceThemeID = themeID
+            settings.pixelThemePaletteID = paletteID
+
+            let controller = SettingsWindowController.shared
+            controller.resetToDefaultContentSize()
+            controller.present(category: .sound)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.35))
+
+            let window = try XCTUnwrap(controller.window)
+            window.displayIfNeeded()
+            let data = try pngData(for: window)
+            try data.write(
+                to: URL(fileURLWithPath: outputDirectory)
+                    .appendingPathComponent("\(filename).png")
+            )
+        }
+    }
+
+    private func pngData(for window: NSWindow) throws -> Data {
+        let frameView = try XCTUnwrap(window.contentView?.superview)
+        frameView.layoutSubtreeIfNeeded()
+        frameView.displayIfNeeded()
+
+        let bounds = frameView.bounds
+        let representation = try XCTUnwrap(
+            frameView.bitmapImageRepForCachingDisplay(in: bounds)
+        )
+        frameView.cacheDisplay(in: bounds, to: representation)
+        return try XCTUnwrap(representation.representation(using: .png, properties: [:]))
+    }
+}
