@@ -5,10 +5,8 @@ import XCTest
 @MainActor
 final class ThemeScreenshotTests: XCTestCase {
     func testWriteSettingsThemeScreenshotsWhenRequested() throws {
-        guard let outputDirectory = ProcessInfo.processInfo.environment["PING_ISLAND_THEME_SCREENSHOT_DIR"],
-              !outputDirectory.isEmpty else {
-            return
-        }
+        let outputDirectory = FileManager.default.currentDirectoryPath
+            + "/build/theme-screenshots"
 
         ExperienceThemeFontRegistry.registerBundledFonts()
         try FileManager.default.createDirectory(

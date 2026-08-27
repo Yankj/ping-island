@@ -33,8 +33,6 @@ jobs:
           --skip SocketServerTests
 
       - name: Run Xcode unit tests
-        env:
-          PING_ISLAND_THEME_SCREENSHOT_DIR: ${{ runner.temp }}/theme-screenshots
         run: >
           xcodebuild
           -project PingIsland.xcodeproj
@@ -47,26 +45,11 @@ jobs:
           test
           -only-testing:PingIslandTests
 
-      - name: Build unsigned DMG and ZIP
-        env:
-          PING_ISLAND_ARCHS: arm64 x86_64
-        run: ./scripts/package-unsigned.sh
-
-      - name: Upload preview package
-        uses: actions/upload-artifact@v4
-        with:
-          name: PingIsland-theme-v3-preview-${{ github.sha }}
-          path: |
-            releases/unsigned/*.dmg
-            releases/unsigned/*.zip
-          if-no-files-found: error
-          retention-days: 7
-
       - name: Upload Settings theme screenshots
         uses: actions/upload-artifact@v4
         with:
           name: PingIsland-theme-v3-screenshots-${{ github.sha }}
-          path: ${{ runner.temp }}/theme-screenshots/*.png
+          path: build/theme-screenshots/*.png
           if-no-files-found: error
           retention-days: 7
 
