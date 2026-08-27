@@ -5,14 +5,7 @@ import XCTest
 @MainActor
 final class ThemeScreenshotTests: XCTestCase {
     func testWriteSettingsThemeScreenshotsWhenRequested() throws {
-        let outputDirectory = FileManager.default.currentDirectoryPath
-            + "/build/theme-screenshots"
-
         ExperienceThemeFontRegistry.registerBundledFonts()
-        try FileManager.default.createDirectory(
-            atPath: outputDirectory,
-            withIntermediateDirectories: true
-        )
 
         let settings = AppSettings.shared
         let originalTheme = settings.experienceThemeID
@@ -45,10 +38,13 @@ final class ThemeScreenshotTests: XCTestCase {
             let window = try XCTUnwrap(controller.window)
             window.displayIfNeeded()
             let data = try pngData(for: window)
-            try data.write(
-                to: URL(fileURLWithPath: outputDirectory)
-                    .appendingPathComponent("\(filename).png")
+            let attachment = XCTAttachment(
+                data: data,
+                uniformTypeIdentifier: "public.png"
             )
+            attachment.name = filename
+            attachment.lifetime = .keepAlways
+            add(attachment)
         }
     }
 

@@ -45,11 +45,18 @@ jobs:
           test
           -only-testing:PingIslandTests
 
+      - name: Export Settings theme screenshots
+        run: |
+          mkdir -p build/theme-screenshots
+          xcrun xcresulttool export attachments \
+            --path "$RUNNER_TEMP/PingIslandTests.xcresult" \
+            --output-path build/theme-screenshots
+
       - name: Upload Settings theme screenshots
         uses: actions/upload-artifact@v4
         with:
           name: PingIsland-theme-v3-screenshots-${{ github.sha }}
-          path: build/theme-screenshots/*.png
+          path: build/theme-screenshots
           if-no-files-found: error
           retention-days: 7
 
