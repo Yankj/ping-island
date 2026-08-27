@@ -1362,7 +1362,7 @@ final class AppSettingsStore: ObservableObject {
         let experienceThemeIDRaw = defaults.string(forKey: Keys.experienceThemeID)
         let resolvedExperienceThemeID = ExperienceThemeID(
             rawValue: experienceThemeIDRaw ?? ""
-        ) ?? .standard
+        ) ?? .appDefault
         let pixelThemePaletteIDRaw = defaults.string(forKey: Keys.pixelThemePaletteID)
         let resolvedPixelThemePaletteID = PixelThemePaletteID(
             rawValue: pixelThemePaletteIDRaw ?? ""
@@ -1656,7 +1656,7 @@ final class AppSettingsStore: ObservableObject {
         if defaults.string(forKey: Keys.soundThemeMode) == nil {
             defaults.set(resolvedSoundThemeMode.rawValue, forKey: Keys.soundThemeMode)
         }
-        if defaults.string(forKey: Keys.experienceThemeID) == nil {
+        if ExperienceThemeID(rawValue: defaults.string(forKey: Keys.experienceThemeID) ?? "") == nil {
             defaults.set(resolvedExperienceThemeID.rawValue, forKey: Keys.experienceThemeID)
         }
         if defaults.string(forKey: Keys.pixelThemePaletteID) == nil {

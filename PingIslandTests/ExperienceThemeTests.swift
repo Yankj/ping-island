@@ -2,6 +2,14 @@ import XCTest
 @testable import Ping_Island
 
 final class ExperienceThemeTests: XCTestCase {
+    func testPingIslandIsTheAppDefaultTheme() {
+        XCTAssertEqual(ExperienceThemeID.appDefault, .standard)
+        XCTAssertEqual(
+            ExperienceThemeRegistry.theme(for: .appDefault).metadata.displayName,
+            "PingIsland 原生"
+        )
+    }
+
     func testRegistryContainsEveryPersistedBuiltInThemeExactlyOnce() {
         let registeredIDs = ExperienceThemeRegistry.all.map(\.id)
 

@@ -9,6 +9,10 @@ enum ExperienceThemeID: String, CaseIterable, Identifiable {
     case macOS
     case pixel
 
+    /// The theme used for fresh installs and as the safe fallback when a
+    /// persisted identifier is missing or no longer recognized.
+    static let appDefault: ExperienceThemeID = .standard
+
     var id: String { rawValue }
 
     var recommendedSoundThemeMode: SoundThemeMode {

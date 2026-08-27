@@ -145,7 +145,8 @@ final class AppSettingsPersistenceTests: XCTestCase {
         let defaults = makeDefaults()
         let store = makeStore(defaults: defaults)
 
-        XCTAssertEqual(store.experienceThemeID, .standard)
+        XCTAssertEqual(store.experienceThemeID, .appDefault)
+        XCTAssertEqual(defaults.string(forKey: "experienceThemeID"), ExperienceThemeID.standard.rawValue)
 
         store.applyExperienceTheme(.pixel)
 
@@ -156,6 +157,16 @@ final class AppSettingsPersistenceTests: XCTestCase {
         XCTAssertEqual(reloadedStore.island8BitTaskErrorSound, .errorBuzz)
         XCTAssertEqual(reloadedStore.island8BitResourceLimitSound, .hurt)
         XCTAssertEqual(defaults.string(forKey: "experienceThemeID"), ExperienceThemeID.pixel.rawValue)
+    }
+
+    func testUnknownExperienceThemeFallsBackToAndPersistsPingIsland() {
+        let defaults = makeDefaults()
+        defaults.set("retired-theme", forKey: "experienceThemeID")
+
+        let store = makeStore(defaults: defaults)
+
+        XCTAssertEqual(store.experienceThemeID, .appDefault)
+        XCTAssertEqual(defaults.string(forKey: "experienceThemeID"), ExperienceThemeID.standard.rawValue)
     }
 
     func testMacOSThemeAppliesSystemSounds() {

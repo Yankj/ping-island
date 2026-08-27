@@ -115,7 +115,7 @@ struct ExperienceThemeSoundProfile {
 
 private struct IslandExperienceThemeEnvironmentKey: EnvironmentKey {
     static let defaultValue = ExperienceThemeRegistry.theme(
-        for: .standard,
+        for: .appDefault,
         pixelPalette: .arcadeNeon
     )
 }

@@ -99,8 +99,10 @@ injects one `IslandExperienceTheme` through SwiftUI's environment. Child views
 read `@Environment(\.islandExperienceTheme)` rather than reaching into settings
 or defining a private palette.
 
-The persisted PingIsland identifier remains `standard`. Do not rename it: the
-raw value is intentionally retained to migrate existing installations safely.
+The persisted PingIsland identifier remains `standard`, and PingIsland 原生 is
+the default for fresh installs and invalid or missing persisted theme values.
+Do not rename it: the raw value is intentionally retained to migrate existing
+installations safely.
 
 ## Adding a first-party theme
 

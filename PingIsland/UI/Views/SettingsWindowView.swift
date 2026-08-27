@@ -40,7 +40,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .shortcuts: return "全局展开与自定义"
         case .display: return "显示器与位置"
         case .mascot: return "客户端宠物与动作"
-        case .sound: return "通知与提示音"
+        case .sound: return "主题与提示音"
         case .analytics: return "Agent、Token 与工具"
         case .integration: return "Hooks 与 IDE 扩展"
         case .remote: return "SSH 主机与远程转发"
@@ -2825,6 +2825,14 @@ private struct SettingsPanelContentView: View {
     }
 
     private var sidebar: some View {
+        sidebarContent
+            .padding(8)
+            .background { sidebarBackground }
+            .overlay { sidebarBorder }
+            .shadow(color: Color.black.opacity(0.20), radius: 24, y: 14)
+    }
+
+    private var sidebarContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
                 if presentation == .window,
@@ -2863,8 +2871,62 @@ private struct SettingsPanelContentView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 14)
         }
-        .padding(8)
-        .background(
+    }
+
+    @ViewBuilder
+    private var sidebarBackground: some View {
+        switch theme.visual.settingsChromeStyle {
+        case .pingIsland:
+            UnevenRoundedRectangle(
+                topLeadingRadius: 24,
+                bottomLeadingRadius: 24,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 0,
+                style: .continuous
+            )
+                .fill(Color.white.opacity(0.055))
+                .overlay {
+                    SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
+                        .clipShape(
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: 24,
+                                bottomLeadingRadius: 24,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 0,
+                                style: .continuous
+                            )
+                        )
+                        .opacity(0.94)
+                }
+                .overlay {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.04),
+                            Color.black.opacity(0.10)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 24,
+                            bottomLeadingRadius: 24,
+                            bottomTrailingRadius: 0,
+                            topTrailingRadius: 0,
+                            style: .continuous
+                        )
+                    )
+                }
+                .overlay(alignment: .topTrailing) {
+                    Circle()
+                        .fill(Color.white.opacity(0.16))
+                        .frame(width: 120, height: 120)
+                        .blur(radius: 36)
+                        .offset(x: 28, y: -26)
+                }
+
+        case .macOS, .pixel:
             UnevenRoundedRectangle(
                 topLeadingRadius: theme.visual.settingsCornerRadius,
                 bottomLeadingRadius: theme.visual.settingsCornerRadius,
@@ -2913,8 +2975,23 @@ private struct SettingsPanelContentView: View {
                         .blur(radius: 36)
                         .offset(x: 28, y: -26)
                 }
-        )
-        .overlay(
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarBorder: some View {
+        switch theme.visual.settingsChromeStyle {
+        case .pingIsland:
+            UnevenRoundedRectangle(
+                topLeadingRadius: 24,
+                bottomLeadingRadius: 24,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 0,
+                style: .continuous
+            )
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+
+        case .macOS, .pixel:
             UnevenRoundedRectangle(
                 topLeadingRadius: theme.visual.settingsCornerRadius,
                 bottomLeadingRadius: theme.visual.settingsCornerRadius,
@@ -2923,8 +3000,7 @@ private struct SettingsPanelContentView: View {
                 style: theme.visual.usesPixelGrid ? .circular : .continuous
             )
                 .strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.20), radius: 24, y: 14)
+        }
     }
 
     private var sidebarWindowControls: some View {
@@ -4195,7 +4271,80 @@ private struct SidebarItemView: View {
     var showsNoticeDot: Bool = false
     @Environment(\.islandExperienceTheme) private var theme
 
+    @ViewBuilder
     var body: some View {
+        switch theme.visual.settingsChromeStyle {
+        case .pingIsland:
+            pingIslandItem
+        case .macOS, .pixel:
+            themedItem
+        }
+    }
+
+    private var pingIslandItem: some View {
+        HStack(spacing: 10) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: category.icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(isSelected ? 0.95 : 1))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(
+                                isSelected
+                                ? LinearGradient(
+                                    colors: [
+                                        category.tint.opacity(0.95),
+                                        category.tint.opacity(0.60)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : LinearGradient(
+                                    colors: [
+                                        category.tint.opacity(0.92),
+                                        category.tint.opacity(0.74)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                noticeDot
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(appLocalized: category.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(isSelected ? 0.94 : 0.80))
+                    .lineLimit(1)
+
+                Text(appLocalized: category.subtitle)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(isSelected ? 0.60 : 0.42))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(isSelected ? Color.white.opacity(0.12) : Color.white.opacity(0.02))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(isSelected ? 0.10 : 0.04), lineWidth: 1)
+        )
+        .shadow(color: isSelected ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var themedItem: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .topTrailing) {
                 ExperienceThemeSidebarSymbol(
@@ -4212,17 +4361,7 @@ private struct SidebarItemView: View {
                         style: theme.visual.usesPixelGrid ? .circular : .continuous
                     ))
 
-                if showsNoticeDot {
-                    Circle()
-                        .fill(TerminalColors.amber)
-                        .frame(width: 7, height: 7)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(Color.black.opacity(0.42), lineWidth: 1)
-                        )
-                        .offset(x: 2, y: -2)
-                        .accessibilityLabel("有需要注意的集成提示")
-                }
+                noticeDot
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -4250,8 +4389,22 @@ private struct SidebarItemView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(theme.visual.settingsCardBorder.opacity(isSelected ? 1 : 0.45), lineWidth: 1)
         )
-        .shadow(color: isSelected && theme.visual.settingsChromeStyle == .pingIsland ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var noticeDot: some View {
+        if showsNoticeDot {
+            Circle()
+                .fill(TerminalColors.amber)
+                .frame(width: 7, height: 7)
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.black.opacity(0.42), lineWidth: 1)
+                )
+                .offset(x: 2, y: -2)
+                .accessibilityLabel("有需要注意的集成提示")
+        }
     }
 
     private var symbolColor: Color {
