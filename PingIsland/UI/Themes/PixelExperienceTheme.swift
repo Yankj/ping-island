@@ -133,14 +133,14 @@ enum PixelExperienceTheme {
                 actionForeground = .white
             case .gameBoyOlive:
                 background = Color(red: 0.059, green: 0.220, blue: 0.059)
-                sidebar = Color(red: 0.188, green: 0.384, blue: 0.188)
-                detail = Color(red: 0.110, green: 0.290, blue: 0.100)
-                card = Color(red: 0.188, green: 0.384, blue: 0.188)
-                border = Color(red: 0.608, green: 0.737, blue: 0.059).opacity(0.82)
-                primaryText = Color(red: 0.608, green: 0.737, blue: 0.059)
-                secondaryText = Color(red: 0.545, green: 0.675, blue: 0.059)
+                sidebar = Color(red: 0.129, green: 0.310, blue: 0.129)
+                detail = Color(red: 0.086, green: 0.227, blue: 0.094)
+                card = Color(red: 0.165, green: 0.341, blue: 0.157)
+                border = Color(red: 0.608, green: 0.737, blue: 0.059).opacity(0.72)
+                primaryText = Color(red: 0.878, green: 0.973, blue: 0.812)
+                secondaryText = Color(red: 0.722, green: 0.831, blue: 0.643)
                 accent = Color(red: 0.608, green: 0.737, blue: 0.059)
-                neutralControl = Color(red: 0.118, green: 0.300, blue: 0.100)
+                neutralControl = Color(red: 0.137, green: 0.302, blue: 0.125)
                 actionForeground = .white
             }
         }

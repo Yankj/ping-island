@@ -299,7 +299,7 @@ private struct ExperienceThemePreview: View {
         .background {
             RoundedRectangle(cornerRadius: theme.visual.sectionCornerRadius)
                 .fill(theme.visual.previewSurface)
-                .overlay(ExperienceThemeGridOverlay())
+                .overlay(ExperienceThemeGridTexture())
         }
     }
 }

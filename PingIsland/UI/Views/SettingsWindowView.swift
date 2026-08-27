@@ -2525,15 +2525,6 @@ private struct SettingsPanelContentView: View {
             )
         }
         .background(theme.visual.settingsSurface)
-        .overlay {
-            ExperienceThemeGridOverlay()
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: panelCornerRadius,
-                        style: theme.visual.usesPixelGrid ? .circular : .continuous
-                    )
-                )
-        }
         .ignoresSafeArea()
         .clipShape(
             RoundedRectangle(
@@ -2867,6 +2858,10 @@ private struct SettingsPanelContentView: View {
             sidebarShape
                 .fill(theme.visual.settingsSidebarSurface)
                 .overlay {
+                    ExperienceThemeGridTexture()
+                        .clipShape(sidebarShape)
+                }
+                .overlay {
                     SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
                         .clipShape(sidebarShape)
                         .opacity(theme.visual.usesGlassMaterial ? 0.94 : 0)
@@ -2938,6 +2933,10 @@ private struct SettingsPanelContentView: View {
         .background(
             detailShape
                 .fill(theme.visual.settingsDetailSurface)
+                .overlay {
+                    ExperienceThemeGridTexture()
+                        .clipShape(detailShape)
+                }
                 .overlay {
                     SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
                         .clipShape(detailShape)

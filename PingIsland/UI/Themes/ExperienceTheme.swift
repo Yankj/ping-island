@@ -129,7 +129,9 @@ extension EnvironmentValues {
     }
 }
 
-struct ExperienceThemeGridOverlay: View {
+/// Decorative texture for Pixel surfaces. Place it inside a surface background
+/// (or before content in a ZStack), never as a root overlay above controls.
+struct ExperienceThemeGridTexture: View {
     @Environment(\.islandExperienceTheme) private var theme
 
     var body: some View {

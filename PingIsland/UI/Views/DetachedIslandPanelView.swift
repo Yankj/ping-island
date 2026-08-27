@@ -1206,7 +1206,7 @@ private struct DetachedIslandBubbleChrome<Content: View>: View {
         ZStack(alignment: .topLeading) {
             shape.fill(theme.visual.detachedSurface)
 
-            ExperienceThemeGridOverlay()
+            ExperienceThemeGridTexture()
                 .mask(shape)
 
             content

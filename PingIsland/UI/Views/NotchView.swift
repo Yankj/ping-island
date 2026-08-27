@@ -585,17 +585,19 @@ struct NotchView: View {
             .frame(maxWidth: isOpened ? notchSize.width : nil, alignment: .top)
             .padding(.horizontal, horizontalInset)
             .padding([.horizontal, .bottom], isOpened ? 12 : 0)
-            .background(theme.visual.islandSurface)
+            .background {
+                theme.visual.islandSurface
+                    .overlay {
+                        ExperienceThemeGridTexture()
+                            .clipShape(currentNotchShape)
+                    }
+            }
             .clipShape(currentNotchShape)
             .overlay(alignment: .top) {
                 Rectangle()
                     .fill(theme.visual.islandTopSeparator)
                     .frame(height: 1)
                     .padding(.horizontal, topCornerRadius)
-            }
-            .overlay {
-                ExperienceThemeGridOverlay()
-                    .clipShape(currentNotchShape)
             }
             .shadow(color: shadowColor, radius: 6)
             .frame(
