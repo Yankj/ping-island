@@ -1,16 +1,16 @@
-name: Theme V2 Preview Package
+name: Theme V3 + Settings UX Preview Package
 
 on:
   push:
     branches:
-      - build/theme-v2-preview-package
+      - build/theme-v3-preview-package
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: theme-v2-preview-${{ github.ref }}
+  group: theme-v3-preview-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
       - name: Upload preview package
         uses: actions/upload-artifact@v4
         with:
-          name: PingIsland-theme-v2-preview-${{ github.sha }}
+          name: PingIsland-theme-v3-preview-${{ github.sha }}
           path: |
             releases/unsigned/*.dmg
             releases/unsigned/*.zip
@@ -64,7 +64,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: PingIsland-theme-v2-tests-${{ github.sha }}
+          name: PingIsland-theme-v3-tests-${{ github.sha }}
           path: ${{ runner.temp }}/PingIslandTests.xcresult
           if-no-files-found: ignore
           retention-days: 7
