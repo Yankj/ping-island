@@ -31,6 +31,9 @@ class SessionMonitor: ObservableObject {
     private let shouldRefreshUsage: Bool
     private var questionDraftCache = SessionQuestionDraftCache()
     private var telemetryPendingAttentionSessionIDs: Set<String> = []
+    private var soundEdgeTracker = SessionSoundEdgeTracker()
+    private var idleReminderSoundTracker = IdleReminderSoundTracker()
+    private var previousUsageSoundPercentage: Double?
 
     init(
         runtimeCoordinator: any RuntimeCoordinating = RuntimeCoordinator.shared,
@@ -283,6 +286,11 @@ class SessionMonitor: ObservableObject {
 
                 guard let interval = policy.sessionMaintenanceInterval else {
                     try? await Task.sleep(for: .seconds(30))
+                    guard !Task.isCancelled else { break }
+                    await MainActor.run {
+                        guard let self else { return }
+                        self.handleIdleReminderSound(self.instances)
+                    }
                     continue
                 }
 
@@ -350,6 +358,7 @@ class SessionMonitor: ObservableObject {
 
             self.claudeUsageSnapshot = claudeSnapshot ?? cachedClaudeSnapshot
             self.codexUsageSnapshot = codexSnapshot ?? cachedCodexSnapshot
+            self.handleUsageSoundTransition()
             self.syncCodexThreadDiscovery(using: self.codexUsageSnapshot)
         }
     }
@@ -824,6 +833,8 @@ class SessionMonitor: ObservableObject {
         let visibleSessions = filteredVisibleSessions(from: allSessions)
         let pendingSessions = visibleSessions.filter { $0.needsAttention }
         recordNewAttentionRequests(in: pendingSessions)
+        handleSessionSoundTransitions(visibleSessions)
+        handleIdleReminderSound(visibleSessions)
         if visibleSessions != instances {
             instances = visibleSessions
         }
@@ -844,12 +855,65 @@ class SessionMonitor: ObservableObject {
         }
     }
 
+    private func handleSessionSoundTransitions(_ sessions: [SessionState]) {
+        guard let edge = soundEdgeTracker.edge(for: sessions) else { return }
+        playEventSoundIfNeeded(edge.event, sessions: edge.sessions)
+    }
+
+    private func handleIdleReminderSound(_ sessions: [SessionState], now: Date = Date()) {
+        let reminderSessions = idleReminderSoundTracker.sessionsNeedingReminder(
+            from: sessions,
+            now: now
+        )
+        guard !reminderSessions.isEmpty else { return }
+        playEventSoundIfNeeded(.idleReminder, sessions: reminderSessions)
+    }
+
+    private func handleUsageSoundTransition() {
+        let current = UsageSoundTransitionEvaluator.maximumUsedPercentage(
+            claude: claudeUsageSnapshot,
+            codex: codexUsageSnapshot
+        )
+        defer { previousUsageSoundPercentage = current }
+        guard let event = UsageSoundTransitionEvaluator.event(
+            previous: previousUsageSoundPercentage,
+            current: current
+        ) else { return }
+        AppSoundFeedback.play(event)
+    }
+
+    private func playEventSoundIfNeeded(
+        _ event: AppSoundFeedbackEvent,
+        sessions: [SessionState]
+    ) {
+        guard AppSettings.soundEnabled else { return }
+
+        Task {
+            guard await shouldPlayNotificationSound(for: sessions) else { return }
+            AppSoundFeedback.play(event)
+        }
+    }
+
+    /// A notification stays quiet only when every originating session can be
+    /// proven to be focused. Missing process metadata intentionally errs toward
+    /// notifying the user.
+    private func shouldPlayNotificationSound(for sessions: [SessionState]) async -> Bool {
+        for session in sessions {
+            guard let pid = session.pid else { return true }
+            if !(await TerminalVisibilityDetector.isSessionFocused(sessionPid: pid)) {
+                return true
+            }
+        }
+        return false
+    }
+
     private func filteredVisibleSessions(from sessions: [SessionState]) -> [SessionState] {
         let visibilityMode = AppSettings.subagentVisibilityMode
         let primaryVisibleSessions = sessions.filter {
             !$0.shouldHideFromPrimaryUI && $0.shouldDisplaySubagent(in: visibilityMode)
         }
-        let dedupedSessions = deduplicateSameProjectClaudeSessions(from: primaryVisibleSessions)
+        let dedupedSessions = SameWorkspaceSessionSupersession
+            .removingSupersededSessions(from: primaryVisibleSessions)
         return dedupedSessions.filter { candidate in
             guard shouldCheckDuplicateVisibility(for: candidate) else {
                 return true
@@ -859,37 +923,6 @@ class SessionMonitor: ObservableObject {
                 candidate.shouldHideAsDuplicateCodexPlaceholder(comparedTo: other)
                     || candidate.shouldHideAsDuplicateOpenCodeChildSession(comparedTo: other)
             }
-        }
-    }
-
-    /// When Claude is resumed or restarted, concurrent hook events can create multiple
-    /// sessions for the same project before endOrphanedSessions has a chance to clean up.
-    /// Keep only the most recently active session per provider + cwd pair.
-    private func deduplicateSameProjectClaudeSessions(
-        from sessions: [SessionState]
-    ) -> [SessionState] {
-        var bestByKey: [String: SessionState] = [:]
-        var order: [String] = []
-
-        for session in sessions {
-            guard session.provider == .claude else { continue }
-            let cwd = session.cwd
-            guard !cwd.isEmpty else { continue }
-            let key = "\(session.provider.rawValue):\(cwd)"
-            if let existing = bestByKey[key] {
-                if session.lastActivity > existing.lastActivity {
-                    bestByKey[key] = session
-                }
-            } else {
-                bestByKey[key] = session
-                order.append(key)
-            }
-        }
-
-        var keep = Set(bestByKey.values.map(\.sessionId))
-        return sessions.filter { session in
-            guard session.provider == .claude, !session.cwd.isEmpty else { return true }
-            return keep.contains(session.sessionId)
         }
     }
 

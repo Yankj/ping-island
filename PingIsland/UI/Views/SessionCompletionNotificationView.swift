@@ -117,9 +117,9 @@ enum SessionCompletionPreviewBuilder {
     }
 }
 
-enum SessionCompletionStateEvaluator {
+nonisolated enum SessionCompletionStateEvaluator {
     static func isCompletedReadySession(_ session: SessionState) -> Bool {
-        guard session.intervention == nil else { return false }
+        guard case nil = session.intervention else { return false }
         guard session.phase == .waitingForInput || isCompletedCodexIdleSession(session) else {
             return false
         }
@@ -132,7 +132,7 @@ enum SessionCompletionStateEvaluator {
 
     static func allowsEndedNotificationAfterWaitingForInput(_ session: SessionState) -> Bool {
         guard session.phase == .ended else { return false }
-        guard session.intervention == nil else { return false }
+        guard case nil = session.intervention else { return false }
         // Qoder CLI and Kimi both use "Stop" for turn-end (goes to .waitingForInput)
         // and "SessionEnd" for actual session closure.
         return session.clientInfo.isQoderCLIClient
@@ -155,27 +155,22 @@ enum SessionCompletionStateEvaluator {
     }
 }
 
+@MainActor
 final class SessionCompletionNotificationRegistry {
     static let shared = SessionCompletionNotificationRegistry()
 
-    private var consumedCodexCompletionKeys = Set<String>()
+    private var consumedCompletionKeys = Set<SessionCompletionKey>()
 
     private init() {}
 
     func isConsumed(session: SessionState) -> Bool {
-        guard let key = codexCompletionKey(for: session) else { return false }
-        return consumedCodexCompletionKeys.contains(key)
+        guard let key = SessionCompletionKey.make(for: session) else { return false }
+        return consumedCompletionKeys.contains(key)
     }
 
     func markConsumed(session: SessionState) {
-        guard let key = codexCompletionKey(for: session) else { return }
-        consumedCodexCompletionKeys.insert(key)
-    }
-
-    private func codexCompletionKey(for session: SessionState) -> String? {
-        guard session.provider == .codex else { return nil }
-        let activityMilliseconds = Int64((session.lastActivity.timeIntervalSince1970 * 1_000).rounded())
-        return "\(session.sessionId):\(activityMilliseconds)"
+        guard let key = SessionCompletionKey.make(for: session) else { return }
+        consumedCompletionKeys.insert(key)
     }
 }
 

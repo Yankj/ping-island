@@ -22,22 +22,30 @@ enum UsageSoundTransitionEvaluator {
 }
 
 struct RapidSubmitSoundTracker {
+    private let retainedSessionLimit: Int
     private var hasPrimed = false
     private var lastObservedMessageDate: [String: Date] = [:]
     private var recentSubmissions: [String: [Date]] = [:]
     private var lastTriggeredAt: [String: Date] = [:]
+    private var lastSeenSequence: [String: UInt64] = [:]
+    private var sequence: UInt64 = 0
+
+    init(retainedSessionLimit: Int = 512) {
+        self.retainedSessionLimit = max(1, retainedSessionLimit)
+    }
 
     mutating func observe(_ sessions: [SessionState], now: Date = Date()) -> [SessionState] {
-        let activeIDs = Set(sessions.map(\.stableId))
-        lastObservedMessageDate = lastObservedMessageDate.filter { activeIDs.contains($0.key) }
-        recentSubmissions = recentSubmissions.filter { activeIDs.contains($0.key) }
-        lastTriggeredAt = lastTriggeredAt.filter { activeIDs.contains($0.key) }
+        sequence &+= 1
+        for session in sessions {
+            lastSeenSequence[session.stableId] = sequence
+        }
 
         guard hasPrimed else {
             for session in sessions {
                 lastObservedMessageDate[session.stableId] = session.lastUserMessageDate
             }
             hasPrimed = true
+            pruneRetainedSessions(visible: sessions)
             return []
         }
 
@@ -64,7 +72,30 @@ struct RapidSubmitSoundTracker {
                 triggered.append(session)
             }
         }
+        pruneRetainedSessions(visible: sessions)
         return triggered
+    }
+
+    /// A filtered session list may temporarily omit a still-running session. Keep
+    /// its recent-submit history across that churn, while bounding long-term state.
+    private mutating func pruneRetainedSessions(visible sessions: [SessionState]) {
+        guard lastSeenSequence.count > retainedSessionLimit else { return }
+
+        let visibleIDs = Set(sessions.map(\.stableId))
+        let evictionOrder = lastSeenSequence
+            .filter { !visibleIDs.contains($0.key) }
+            .sorted { $0.value < $1.value }
+
+        var overflow = lastSeenSequence.count - retainedSessionLimit
+        for entry in evictionOrder {
+            guard overflow > 0 else { break }
+            let id = entry.key
+            lastSeenSequence.removeValue(forKey: id)
+            lastObservedMessageDate.removeValue(forKey: id)
+            recentSubmissions.removeValue(forKey: id)
+            lastTriggeredAt.removeValue(forKey: id)
+            overflow -= 1
+        }
     }
 }
 

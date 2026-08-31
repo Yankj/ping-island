@@ -580,6 +580,96 @@ final class SessionStoreCodexInterventionTests: XCTestCase {
         await store.process(.sessionArchived(sessionId: sessionId))
     }
 
+    func testStaleCodexIdleAssistantSnapshotDoesNotProduceCompletionSound() async throws {
+        let sessionId = "codex-stale-completion-\(UUID().uuidString)"
+        let store = SessionStore.shared
+        let staleActivityAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let freshActivityAt = staleActivityAt.addingTimeInterval(120)
+
+        await store.syncCodexThreadSnapshot(
+            CodexThreadSnapshot(
+                threadId: sessionId,
+                name: "Codex",
+                preview: "Working on turn two",
+                cwd: "/tmp/project",
+                clientInfo: SessionClientInfo.codexApp(threadId: sessionId),
+                intervention: nil,
+                createdAt: staleActivityAt,
+                updatedAt: freshActivityAt,
+                phase: .processing,
+                historyItems: [
+                    ChatHistoryItem(
+                        id: "user-2",
+                        type: .user("Start turn two"),
+                        timestamp: freshActivityAt
+                    )
+                ],
+                conversationInfo: ConversationInfo(
+                    summary: "Codex",
+                    lastMessage: "Start turn two",
+                    lastMessageRole: "user",
+                    lastToolName: nil,
+                    firstUserMessage: "Start turn two",
+                    lastUserMessageDate: freshActivityAt
+                ),
+                latestTurnId: "turn-2",
+                latestResponseText: nil,
+                latestResponsePhase: nil,
+                latestUserText: "Start turn two"
+            )
+        )
+
+        let activeSession = await store.session(for: sessionId)
+        let active = try XCTUnwrap(activeSession)
+        var tracker = SessionSoundEdgeTracker()
+        tracker.prime(with: [active])
+
+        await store.syncCodexThreadSnapshot(
+            CodexThreadSnapshot(
+                threadId: sessionId,
+                name: "Codex",
+                preview: "Old turn result",
+                cwd: "/tmp/project",
+                clientInfo: SessionClientInfo.codexApp(threadId: sessionId),
+                intervention: nil,
+                createdAt: staleActivityAt,
+                updatedAt: staleActivityAt,
+                phase: .idle,
+                historyItems: [
+                    ChatHistoryItem(
+                        id: "assistant-1",
+                        type: .assistant("Old turn result"),
+                        timestamp: staleActivityAt
+                    )
+                ],
+                conversationInfo: ConversationInfo(
+                    summary: "Codex",
+                    lastMessage: "Old turn result",
+                    lastMessageRole: "assistant",
+                    lastToolName: nil,
+                    firstUserMessage: "Turn one",
+                    lastUserMessageDate: staleActivityAt
+                ),
+                latestTurnId: "turn-1",
+                latestResponseText: "Old turn result",
+                latestResponsePhase: "final",
+                latestUserText: "Turn one"
+            )
+        )
+
+        let reconciledSession = await store.session(for: sessionId)
+        let reconciled = try XCTUnwrap(reconciledSession)
+        XCTAssertEqual(reconciled.phase, .processing)
+        XCTAssertEqual(reconciled.latestTurnId, "turn-2")
+        XCTAssertEqual(reconciled.previewText, active.previewText)
+        XCTAssertEqual(reconciled.chatItems, active.chatItems)
+        XCTAssertEqual(reconciled.conversationInfo, active.conversationInfo)
+        XCTAssertFalse(SessionCompletionStateEvaluator.isCompletedReadySession(reconciled))
+        XCTAssertNil(tracker.edge(for: [reconciled]))
+
+        await store.process(.sessionArchived(sessionId: sessionId))
+    }
+
     func testCodexIdleRefreshDoesNotDowngradeRunningToolThread() async {
         let sessionId = "codex-running-tool-\(UUID().uuidString)"
         let store = SessionStore.shared

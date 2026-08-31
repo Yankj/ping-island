@@ -1,6 +1,238 @@
 import Foundation
 import os.log
 
+nonisolated struct RolloutRecoveryKey: Hashable {
+    let threadId: String
+    let normalizedPath: String
+
+    init(threadId: String, rolloutPath: String?) {
+        self.threadId = threadId
+        self.normalizedPath = Self.normalize(rolloutPath)
+    }
+
+    nonisolated static func normalize(_ path: String?) -> String {
+        guard let path = path?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty else {
+            return ""
+        }
+        return URL(fileURLWithPath: path).standardizedFileURL.path
+    }
+}
+
+nonisolated struct CodexRolloutRecoveryCache {
+    struct Update: Equatable {
+        let shouldRequestFileSync: Bool
+        let discardedParserPath: String?
+    }
+
+    private(set) var versions: [RolloutRecoveryKey: String] = [:]
+    private(set) var canonicalPaths: [String: String] = [:]
+
+    mutating func update(
+        threadId: String,
+        rolloutPath: String?,
+        recoveryVersion: String
+    ) -> Update {
+        let incomingPath = RolloutRecoveryKey.normalize(rolloutPath)
+        let effectivePath = incomingPath.isEmpty
+            ? (canonicalPaths[threadId] ?? "")
+            : incomingPath
+        let previousPath = canonicalPaths[threadId]
+        let discardedParserPath: String?
+
+        if !effectivePath.isEmpty, previousPath != effectivePath {
+            discardedParserPath = previousPath
+            canonicalPaths[threadId] = effectivePath
+        } else {
+            discardedParserPath = nil
+        }
+
+        let key = RolloutRecoveryKey(threadId: threadId, rolloutPath: effectivePath)
+        guard versions[key] != recoveryVersion else {
+            return Update(
+                shouldRequestFileSync: false,
+                discardedParserPath: discardedParserPath
+            )
+        }
+
+        versions[key] = recoveryVersion
+        return Update(
+            shouldRequestFileSync: true,
+            discardedParserPath: discardedParserPath
+        )
+    }
+
+    mutating func removeThread(_ threadId: String) -> String? {
+        versions = versions.filter { $0.key.threadId != threadId }
+        return canonicalPaths.removeValue(forKey: threadId)
+    }
+
+    mutating func removeAll() {
+        versions.removeAll()
+        canonicalPaths.removeAll()
+    }
+}
+
+nonisolated enum CodexThreadListNormalizer {
+    private struct Candidate {
+        let thread: [String: Any]
+        let originalIndex: Int
+        let isActive: Bool
+        let updatedAt: Date?
+        let rolloutPath: String?
+        let rolloutModificationDate: Date?
+        let hasReadableRollout: Bool
+    }
+
+    private enum GroupKey: Hashable {
+        case thread(String)
+        case anonymous(Int)
+    }
+
+    nonisolated static func canonicalThreads(
+        from threads: [[String: Any]],
+        preferredRolloutPaths: [String: String] = [:]
+    ) -> [[String: Any]] {
+        var groupOrder: [GroupKey] = []
+        var candidatesByGroup: [GroupKey: [Candidate]] = [:]
+
+        for (index, thread) in threads.enumerated() {
+            let threadId = (thread["id"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let key: GroupKey
+            if let threadId, !threadId.isEmpty {
+                key = .thread(threadId)
+            } else {
+                key = .anonymous(index)
+            }
+            if candidatesByGroup[key] == nil {
+                groupOrder.append(key)
+            }
+
+            let rolloutPath = CodexAppServerMonitor.rolloutPath(from: thread)
+            let modificationDate = rolloutPath.flatMap { path in
+                (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate]) as? Date
+            }
+            candidatesByGroup[key, default: []].append(Candidate(
+                thread: thread,
+                originalIndex: index,
+                isActive: (thread["status"] as? [String: Any])?["type"] as? String == "active",
+                updatedAt: CodexAppServerMonitor.threadLifecycleDates(from: thread).updatedAt,
+                rolloutPath: rolloutPath,
+                rolloutModificationDate: modificationDate,
+                hasReadableRollout: rolloutPath.map(FileManager.default.isReadableFile(atPath:)) ?? false
+            ))
+        }
+
+        return groupOrder.compactMap { key in
+            guard let candidates = candidatesByGroup[key], var selected = candidates.first else {
+                return nil
+            }
+            let preferredPath: String?
+            if case .thread(let threadId) = key {
+                preferredPath = preferredRolloutPaths[threadId]
+            } else {
+                preferredPath = nil
+            }
+
+            for candidate in candidates.dropFirst() where isPreferred(
+                candidate,
+                over: selected,
+                preferredRolloutPath: preferredPath
+            ) {
+                selected = candidate
+            }
+            guard case .thread(let threadId) = key else {
+                return selected.thread
+            }
+            return preservingPreferredRolloutPath(
+                in: selected.thread,
+                threadId: threadId,
+                preferredRolloutPath: preferredPath
+            )
+        }
+    }
+
+    /// A continuation rollout remains canonical when a later poll temporarily
+    /// returns only an older row for the same thread. The preferred path is kept
+    /// only while it is still readable and at least as new as the incoming path.
+    private nonisolated static func preservingPreferredRolloutPath(
+        in thread: [String: Any],
+        threadId: String,
+        preferredRolloutPath: String?
+    ) -> [String: Any] {
+        let preferredPath = RolloutRecoveryKey.normalize(preferredRolloutPath)
+        let incomingPath = RolloutRecoveryKey.normalize(
+            CodexAppServerMonitor.rolloutPath(from: thread)
+        )
+        guard !preferredPath.isEmpty,
+              preferredPath != incomingPath,
+              FileManager.default.isReadableFile(atPath: preferredPath) else {
+            return thread
+        }
+
+        let preferredModificationDate = modificationDate(for: preferredPath)
+        let incomingModificationDate = modificationDate(for: incomingPath)
+        if prefersNewer(incomingModificationDate, than: preferredModificationDate) == true {
+            return thread
+        }
+
+        var canonicalThread = thread
+        canonicalThread["rolloutPath"] = preferredPath
+        canonicalThread["id"] = threadId
+        return canonicalThread
+    }
+
+    private nonisolated static func isPreferred(
+        _ lhs: Candidate,
+        over rhs: Candidate,
+        preferredRolloutPath: String?
+    ) -> Bool {
+        if lhs.isActive != rhs.isActive {
+            return lhs.isActive
+        }
+        if let decision = prefersNewer(lhs.updatedAt, than: rhs.updatedAt) {
+            return decision
+        }
+        if let decision = prefersNewer(lhs.rolloutModificationDate, than: rhs.rolloutModificationDate) {
+            return decision
+        }
+        if lhs.hasReadableRollout != rhs.hasReadableRollout {
+            return lhs.hasReadableRollout
+        }
+
+        let normalizedPreferredPath = RolloutRecoveryKey.normalize(preferredRolloutPath)
+        if !normalizedPreferredPath.isEmpty {
+            let lhsMatches = RolloutRecoveryKey.normalize(lhs.rolloutPath) == normalizedPreferredPath
+            let rhsMatches = RolloutRecoveryKey.normalize(rhs.rolloutPath) == normalizedPreferredPath
+            if lhsMatches != rhsMatches {
+                return lhsMatches
+            }
+        }
+
+        return lhs.originalIndex < rhs.originalIndex
+    }
+
+    private nonisolated static func prefersNewer(_ lhs: Date?, than rhs: Date?) -> Bool? {
+        switch (lhs, rhs) {
+        case let (lhs?, rhs?) where lhs != rhs:
+            return lhs > rhs
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        default:
+            return nil
+        }
+    }
+
+    private nonisolated static func modificationDate(for path: String) -> Date? {
+        guard !path.isEmpty else { return nil }
+        return (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate]) as? Date
+    }
+}
+
 actor CodexAppServerMonitor {
     static let shared = CodexAppServerMonitor()
 
@@ -50,7 +282,7 @@ actor CodexAppServerMonitor {
     private var pendingResponses: [String: CheckedContinuation<[String: Any], Error>] = [:]
     private var pendingRequestsByThread: [String: PendingRequest] = [:]
     private var threadApprovalModes: [String: String] = [:]  // threadId → approvalMode
-    private var rolloutRecoveryVersions: [String: String] = [:]
+    private var rolloutRecoveryCache = CodexRolloutRecoveryCache()
     private var recoveredNotLoadedThreadVersions: [String: String] = [:]
     private var resolvedClientBundleIdentifier: String?
     private var resolvedClientName: String?
@@ -116,7 +348,7 @@ actor CodexAppServerMonitor {
         process = nil
         pendingRequestsByThread.removeAll()
         threadApprovalModes.removeAll()
-        rolloutRecoveryVersions.removeAll()
+        rolloutRecoveryCache.removeAll()
         recoveredNotLoadedThreadVersions.removeAll()
         lastThreadDiagnostics.removeAll()
 
@@ -619,7 +851,7 @@ actor CodexAppServerMonitor {
         case "thread/archived":
             guard let threadId = params["threadId"] as? String else { return }
             logger.info("Codex thread archived thread=\(threadId, privacy: .public)")
-            rolloutRecoveryVersions.removeValue(forKey: threadId)
+            await clearRolloutRecoveryState(threadId: threadId)
             recoveredNotLoadedThreadVersions.removeValue(forKey: threadId)
             removeThreadDiagnostics(threadId: threadId)
             await SessionStore.shared.process(.sessionEnded(sessionId: threadId))
@@ -910,14 +1142,36 @@ actor CodexAppServerMonitor {
     private func ingestThreadList(_ response: [String: Any]) async {
         guard let data = response["data"] as? [[String: Any]] else { return }
         let visibleThreads = data.filter { !Self.shouldIgnoreAuxiliaryThread($0) }
-        lastThreadDiagnostics = visibleThreads.map(Self.makeThreadDiagnosticsSnapshot(from:))
-        logger.info(
-            "Codex thread list received count=\(data.count, privacy: .public) filtered=\(data.count - visibleThreads.count, privacy: .public)"
+        let candidateCounts = Dictionary(
+            grouping: visibleThreads.compactMap { thread -> (String, [String: Any])? in
+                guard let threadId = (thread["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !threadId.isEmpty else {
+                    return nil
+                }
+                return (threadId, thread)
+            },
+            by: { $0.0 }
         )
-        for thread in visibleThreads {
+        let canonicalThreads = CodexThreadListNormalizer.canonicalThreads(
+            from: visibleThreads,
+            preferredRolloutPaths: rolloutRecoveryCache.canonicalPaths
+        )
+        lastThreadDiagnostics = canonicalThreads.map(Self.makeThreadDiagnosticsSnapshot(from:))
+        logger.info(
+            "Codex thread list received count=\(data.count, privacy: .public) filtered=\(data.count - visibleThreads.count, privacy: .public) deduplicated=\(visibleThreads.count - canonicalThreads.count, privacy: .public)"
+        )
+        for thread in canonicalThreads {
+            if let threadId = thread["id"] as? String,
+               let candidates = candidateCounts[threadId],
+               candidates.count > 1 {
+                let selectedPath = Self.rolloutPath(from: thread) ?? "none"
+                logger.notice(
+                    "Codex duplicate thread normalized threadPrefix=\(String(threadId.prefix(8)), privacy: .public) candidates=\(candidates.count, privacy: .public) selectedPath=\(selectedPath, privacy: .private)"
+                )
+            }
             await ingestThread(thread)
         }
-        await recoverRecentNotLoadedThreads(visibleThreads)
+        await recoverRecentNotLoadedThreads(canonicalThreads)
     }
 
     private func recoverRecentNotLoadedThreads(_ threads: [[String: Any]]) async {
@@ -1000,7 +1254,7 @@ actor CodexAppServerMonitor {
         guard let threadId = thread["id"] as? String else { return }
         if Self.shouldIgnoreAuxiliaryThread(thread) {
             logger.notice("Ignoring auxiliary Codex thread=\(threadId, privacy: .public)")
-            rolloutRecoveryVersions.removeValue(forKey: threadId)
+            await clearRolloutRecoveryState(threadId: threadId)
             recoveredNotLoadedThreadVersions.removeValue(forKey: threadId)
             removeThreadDiagnostics(threadId: threadId)
             return
@@ -1050,11 +1304,26 @@ actor CodexAppServerMonitor {
         )
 
         if Self.shouldRecoverRolloutSnapshot(from: thread),
-           let recoveryVersion = Self.rolloutRecoveryVersion(from: thread),
-           rolloutRecoveryVersions[threadId] != recoveryVersion {
-            rolloutRecoveryVersions[threadId] = recoveryVersion
+           let recoveryVersion = Self.rolloutRecoveryVersion(from: thread) {
+            let recoveryUpdate = rolloutRecoveryCache.update(
+                threadId: threadId,
+                rolloutPath: Self.rolloutPath(from: thread),
+                recoveryVersion: recoveryVersion
+            )
+            if let discardedParserPath = recoveryUpdate.discardedParserPath {
+                await CodexRolloutParser.shared.discardCache(forFilePath: discardedParserPath)
+                logger.debug(
+                    "Codex rollout parser cache discarded threadPrefix=\(String(threadId.prefix(8)), privacy: .public) oldPath=\(discardedParserPath, privacy: .private)"
+                )
+            }
+            guard recoveryUpdate.shouldRequestFileSync else { return }
             await SessionStore.shared.requestFileSync(for: threadId)
         }
+    }
+
+    private func clearRolloutRecoveryState(threadId: String) async {
+        guard let parserPath = rolloutRecoveryCache.removeThread(threadId) else { return }
+        await CodexRolloutParser.shared.discardCache(forFilePath: parserPath)
     }
 
     nonisolated static func shouldRecoverRolloutSnapshot(

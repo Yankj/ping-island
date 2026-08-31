@@ -71,14 +71,15 @@ actor CodexRolloutParser {
 
         let fileSize = fileSizeNumber.uint64Value
         let fileIdentifier = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
+        let cachePath = fileURL.standardizedFileURL.path
 
-        if let cached = cache[fileURL.path],
+        if let cached = cache[cachePath],
            cached.modificationDate == modificationDate,
            cached.fileSize == fileSize {
             return cached.visibleSnapshot
         }
 
-        let previous = cache[fileURL.path]
+        let previous = cache[cachePath]
         let canReadIncrementally = previous.map {
             $0.fileIdentifier == fileIdentifier && fileSize > $0.readOffset
         } ?? false
@@ -122,7 +123,7 @@ actor CodexRolloutParser {
             incrementalReadCount: (previousMetrics?.incrementalReadCount ?? 0) + (canReadIncrementally ? 1 : 0),
             lastReadByteCount: readResult.bytesRead
         )
-        cache[fileURL.path] = CachedSnapshot(
+        cache[cachePath] = CachedSnapshot(
             modificationDate: modificationDate,
             fileIdentifier: fileIdentifier,
             fileSize: fileSize,
@@ -139,7 +140,12 @@ actor CodexRolloutParser {
     }
 
     func debugReadMetrics(forFilePath filePath: String) -> DebugReadMetrics? {
-        cache[filePath]?.metrics
+        cache[URL(fileURLWithPath: filePath).standardizedFileURL.path]?.metrics
+    }
+
+    func discardCache(forFilePath filePath: String) {
+        let normalizedPath = URL(fileURLWithPath: filePath).standardizedFileURL.path
+        cache.removeValue(forKey: normalizedPath)
     }
 
     private func readRollout(

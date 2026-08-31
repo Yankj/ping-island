@@ -1080,7 +1080,12 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
         let firstActivityAt = Date()
         let laterActivityAt = firstActivityAt.addingTimeInterval(5)
         sessionMonitor.instances = [
-            makeCodexCompletedSession(id: sessionId, phase: .processing, lastActivity: firstActivityAt)
+            makeCodexCompletedSession(
+                id: sessionId,
+                phase: .processing,
+                lastActivity: firstActivityAt,
+                turnId: "turn-1"
+            )
         ]
 
         let controller = DetachedIslandWindowController(
@@ -1093,7 +1098,7 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
 
         controller.present(atPetAnchor: CGPoint(x: 1200, y: 220))
         controller.applySessionSnapshotForTesting([
-            makeCodexCompletedSession(id: sessionId, lastActivity: firstActivityAt)
+            makeCodexCompletedSession(id: sessionId, lastActivity: firstActivityAt, turnId: "turn-1")
         ])
 
         let firstBubblePresented = expectation(description: "first codex completion opens")
@@ -1113,10 +1118,15 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
         wait(for: [firstBubbleDismissed], timeout: 1.0)
 
         controller.applySessionSnapshotForTesting([
-            makeCodexCompletedSession(id: sessionId, phase: .processing, lastActivity: laterActivityAt)
+            makeCodexCompletedSession(
+                id: sessionId,
+                phase: .processing,
+                lastActivity: laterActivityAt,
+                turnId: "turn-2"
+            )
         ])
         controller.applySessionSnapshotForTesting([
-            makeCodexCompletedSession(id: sessionId, lastActivity: laterActivityAt)
+            makeCodexCompletedSession(id: sessionId, lastActivity: laterActivityAt, turnId: "turn-2")
         ])
 
         let laterBubblePresented = expectation(description: "later codex completion opens")
@@ -1734,7 +1744,8 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
     private func makeCodexCompletedSession(
         id: String,
         phase: SessionPhase = .idle,
-        lastActivity: Date = Date()
+        lastActivity: Date = Date(),
+        turnId: String? = nil
     ) -> SessionState {
         SessionState(
             sessionId: id,
@@ -1762,6 +1773,7 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
                 firstUserMessage: "Do it",
                 lastUserMessageDate: lastActivity.addingTimeInterval(-5)
             ),
+            latestTurnId: turnId,
             lastActivity: lastActivity,
             createdAt: lastActivity.addingTimeInterval(-10)
         )

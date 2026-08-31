@@ -3,6 +3,99 @@ import XCTest
 @testable import Ping_Island
 
 final class SessionCompletionStateEvaluatorTests: XCTestCase {
+    func testCodexCompletionKeyUsesStableTurnAndAssistantItemIdentifiers() throws {
+        var session = SessionState(
+            sessionId: "codex-completion-key",
+            cwd: "/tmp/project",
+            provider: .codex,
+            clientInfo: SessionClientInfo.codexApp(threadId: "codex-completion-key"),
+            phase: .idle,
+            chatItems: [
+                ChatHistoryItem(
+                    id: "assistant-1",
+                    type: .assistant("Done"),
+                    timestamp: Date(timeIntervalSince1970: 10)
+                )
+            ],
+            latestTurnId: "turn-1",
+            lastActivity: Date(timeIntervalSince1970: 10)
+        )
+
+        let first = try XCTUnwrap(SessionCompletionKey.make(for: session))
+        session.lastActivity = Date(timeIntervalSince1970: 999)
+        let replay = try XCTUnwrap(SessionCompletionKey.make(for: session))
+
+        XCTAssertEqual(first, replay)
+        XCTAssertEqual(first.sessionId, "codex-completion-key")
+        XCTAssertEqual(first.turnId, "turn-1")
+        XCTAssertEqual(first.assistantItemId, "assistant-1")
+    }
+
+    func testCompletionNotificationRegistryUsesSharedCompletionKeyLogic() {
+        let registry = SessionCompletionNotificationRegistry.shared
+        var session = SessionState(
+            sessionId: "codex-notification-key",
+            cwd: "/tmp/project",
+            provider: .codex,
+            clientInfo: SessionClientInfo.codexApp(threadId: "codex-notification-key"),
+            phase: .idle,
+            chatItems: [
+                ChatHistoryItem(
+                    id: "assistant-1",
+                    type: .assistant("Done"),
+                    timestamp: Date(timeIntervalSince1970: 10)
+                )
+            ],
+            latestTurnId: "turn-1",
+            lastActivity: Date(timeIntervalSince1970: 10)
+        )
+
+        XCTAssertFalse(registry.isConsumed(session: session))
+        registry.markConsumed(session: session)
+        session.lastActivity = Date(timeIntervalSince1970: 999)
+        XCTAssertTrue(registry.isConsumed(session: session))
+
+        session.latestTurnId = "turn-2"
+        session.chatItems = [
+            ChatHistoryItem(
+                id: "assistant-2",
+                type: .assistant("Done again"),
+                timestamp: Date(timeIntervalSince1970: 1_000)
+            )
+        ]
+        XCTAssertFalse(registry.isConsumed(session: session))
+    }
+
+    func testAssistantlessCompletionKeyUsesStableCompletionSequenceInsteadOfActivity() throws {
+        var session = SessionState(
+            sessionId: "assistantless-completion",
+            cwd: "/tmp/project",
+            provider: .kimi,
+            clientInfo: SessionClientInfo.default(for: .kimi),
+            phase: .waitingForInput,
+            conversationInfo: ConversationInfo(
+                summary: nil,
+                lastMessage: nil,
+                lastMessageRole: "assistant",
+                lastToolName: nil,
+                firstUserMessage: nil,
+                lastUserMessageDate: nil
+            ),
+            completionSequence: 7,
+            lastActivity: Date(timeIntervalSince1970: 10)
+        )
+
+        let first = try XCTUnwrap(SessionCompletionKey.make(for: session))
+        session.lastActivity = Date(timeIntervalSince1970: 999)
+        let replay = try XCTUnwrap(SessionCompletionKey.make(for: session))
+
+        XCTAssertEqual(first, replay)
+        XCTAssertEqual(first.turnId, "completion-7")
+
+        session.completionSequence = 8
+        XCTAssertNotEqual(first, SessionCompletionKey.make(for: session))
+    }
+
     func testCompletedAssistantReplyRejectsToolOnlyTail() {
         let session = SessionState(
             sessionId: "tool-tail",

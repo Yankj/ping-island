@@ -58,6 +58,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
     var codexSubagentDepth: Int?
     var codexSubagentNickname: String?
     var codexSubagentRole: String?
+    var latestTurnId: String?
+    var completionSequence: UInt64
     var linkedParentSessionId: String?
     var linkedSubagentDisplayTitle: String?
     var heuristicSubagentDisplayTitle: String?
@@ -148,6 +150,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
             lastToolName: nil, firstUserMessage: nil, lastUserMessageDate: nil
         ),
         needsClearReconciliation: Bool = false,
+        latestTurnId: String? = nil,
+        completionSequence: UInt64 = 0,
         lastActivity: Date = Date(),
         createdAt: Date = Date()
     ) {
@@ -167,6 +171,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.codexSubagentDepth = codexSubagentDepth
         self.codexSubagentNickname = codexSubagentNickname
         self.codexSubagentRole = codexSubagentRole
+        self.latestTurnId = latestTurnId
+        self.completionSequence = completionSequence
         self.linkedParentSessionId = linkedParentSessionId
         self.linkedSubagentDisplayTitle = linkedSubagentDisplayTitle
         self.heuristicSubagentDisplayTitle = heuristicSubagentDisplayTitle
@@ -203,6 +209,27 @@ struct SessionState: Equatable, Identifiable, Sendable {
         needsApprovalResponse || needsQuestionResponse || suppressInAppPromptControls
     }
 
+    /// Whether the session is provably still executing: the newest chat item is a
+    /// thinking block or a running tool call.
+    ///
+    /// Used as liveness evidence when deciding whether a session may be archived or
+    /// hidden in favour of a newer session in the same workspace, and when deciding
+    /// whether an apparently idle hook event should end an active phase.
+    nonisolated var hasLiveExecutionEvidence: Bool {
+        for item in chatItems.reversed() {
+            switch item.type {
+            case .thinking:
+                return true
+            case .toolCall(let tool):
+                return tool.status == .running
+            case .assistant, .user, .interrupted:
+                return false
+            }
+        }
+
+        return false
+    }
+
     /// The active permission context, if any
     nonisolated var activePermission: PermissionContext? {
         if case .waitingForApproval(let ctx) = phase {
@@ -221,7 +248,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         return sessionId
     }
 
-    /// Display title: summary > first user message > project name
+    /// Display title: session name > transcript title (Claude Code `custom-title`, legacy `summary`) > first user message > project name
     nonisolated var displayTitle: String {
         sessionName
             ?? SessionTextSanitizer.sanitizedDisplayText(conversationInfo.summary)

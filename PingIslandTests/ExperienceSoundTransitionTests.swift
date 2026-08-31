@@ -2,6 +2,22 @@ import XCTest
 @testable import Ping_Island
 
 final class ExperienceSoundTransitionTests: XCTestCase {
+    private func session(id: String, lastUserMessageDate: Date) -> SessionState {
+        SessionState(
+            sessionId: id,
+            cwd: "/tmp/project",
+            conversationInfo: ConversationInfo(
+                summary: nil,
+                lastMessage: "message",
+                lastMessageRole: "user",
+                lastToolName: nil,
+                firstUserMessage: "message",
+                lastUserMessageDate: lastUserMessageDate
+            ),
+            lastActivity: lastUserMessageDate
+        )
+    }
+
     func testUsageWarningOnlyFiresWhenCrossingNinetyPercent() {
         XCTAssertNil(UsageSoundTransitionEvaluator.event(previous: nil, current: 95))
         XCTAssertNil(UsageSoundTransitionEvaluator.event(previous: 91, current: 96))
@@ -37,5 +53,34 @@ final class ExperienceSoundTransitionTests: XCTestCase {
         XCTAssertTrue(tracker.sessionsNeedingReminder(from: [session], now: now).isEmpty)
         session.phase = .waitingForInput
         XCTAssertEqual(tracker.sessionsNeedingReminder(from: [session], now: now).count, 1)
+    }
+
+    func testRapidSubmitHistorySurvivesTemporaryListChurn() {
+        let now = Date()
+        var tracker = RapidSubmitSoundTracker()
+        tracker.observe([session(id: "a", lastUserMessageDate: now.addingTimeInterval(-2))], now: now)
+
+        XCTAssertTrue(
+            tracker.observe(
+                [session(id: "a", lastUserMessageDate: now)],
+                now: now
+            ).isEmpty
+        )
+        XCTAssertTrue(tracker.observe([], now: now.addingTimeInterval(0.5)).isEmpty)
+        XCTAssertTrue(
+            tracker.observe(
+                [session(id: "a", lastUserMessageDate: now.addingTimeInterval(1))],
+                now: now.addingTimeInterval(1)
+            ).isEmpty
+        )
+        XCTAssertTrue(tracker.observe([], now: now.addingTimeInterval(1.5)).isEmpty)
+
+        XCTAssertEqual(
+            tracker.observe(
+                [session(id: "a", lastUserMessageDate: now.addingTimeInterval(2))],
+                now: now.addingTimeInterval(2)
+            ).map(\.sessionId),
+            ["a"]
+        )
     }
 }
